@@ -12,6 +12,7 @@ import (
 	"amulet/types"
 	"sort"
 	"time"
+	"gate/conf"
 )
 
 type Engine struct {
@@ -24,6 +25,7 @@ type Engine struct {
 
 func (this *Engine) Init() {
 	startTime := time.Now()
+	conf.LoadConfig("config.json")
 	this.Indexer = &core.Indexer{}
 	this.StopToken = &core.StopToken{}
 	this.Sego = &sego.Segmenter{}

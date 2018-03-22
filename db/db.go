@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	_ "github.com/go-sql-driver/mysql"
+
+	"amulet/config"
 )
 type MysqlDB struct {
 	DB *sql.DB
@@ -69,14 +71,14 @@ func GetDB() *MysqlDB {
 }
 
 func (this *MysqlDB)Init(){
-	path:=fmt.Sprintf("%s:%s@tcp(127.0.0.1:%d)/%s?charset=utf8mb4","xxx","xxx",3306,"xxx")
+	path:=fmt.Sprintf("%s:%s@tcp(127.0.0.1:%d)/%s?charset=utf8mb4",config.Config().UserName,config.Config().Password,config.Config().Port,config.Config().Table)
 	glog.Info("wait init db...",path)
 	defer glog.Info("init db ok!")
 	//db,err := sql.Open("mysql","root:licheng19931202@tcp(127.0.0.1:3306)/trace?charset=utf8")
 	//db,err := sql.Open("mysql","root:licheng@tcp(127.0.0.1:3306)/waste?charset=utf8")
 	db,err := sql.Open("mysql",path)
 	if err!=nil{
-		panic(err.Error())
+		glog.Info("db init error! ",err.Error())
 	}else{
 		this.DB = db
 	}
