@@ -12,7 +12,7 @@ import (
 	"amulet/types"
 	"sort"
 	"time"
-	"gate/conf"
+	"amulet/config"
 )
 
 type Engine struct {
@@ -21,16 +21,18 @@ type Engine struct {
 	Sego            *sego.Segmenter
 	DB		*db.MysqlDB
 	DocsManager     *core.DocsManager
+	TextRank        *core.TextRank
 }
 
 func (this *Engine) Init() {
 	startTime := time.Now()
-	conf.LoadConfig("config.json")
+	config.LoadConfig("config.json")
 	this.Indexer = &core.Indexer{}
 	this.StopToken = &core.StopToken{}
 	this.Sego = &sego.Segmenter{}
 	this.DB = &db.MysqlDB{}
 	this.DocsManager = &core.DocsManager{}
+	this.TextRank = &core.TextRank{}
 
 	this.Indexer.Init()
 	this.StopToken.Init()
@@ -74,11 +76,14 @@ func (this *Engine) CreateIndex() {
 				terms = append(terms, item)
 			}
 		}
+		// 计算TextRank
+		textRankScore := this.TextRank.GetRankList(terms)
 		for _, item := range terms {
 			// 去掉两边的空格
 			keyword := &core.Keyword{}
 			keyword.Text = item
 			keyword.Frequency+= 1.0/float32(len(terms))
+			keyword.TextRank = textRankScore[item]
 			document.Keyword = append(document.Keyword, keyword)
 		}
 		this.DocsManager.Add(document)
@@ -158,6 +163,7 @@ func (this *Engine) Search(w http.ResponseWriter,r *http.Request) {
 		for i, docid := range indices.DocIds {
 			doc := this.DocsManager.Get(docid)
 			doc.Frequency = indices.Frequencys[i]
+			doc.TextRank = indices.TextRank[i]
 			if doc != nil {
 				ret = append(ret, doc)
 			}

@@ -15,12 +15,14 @@ type Document struct {
 	Id              int		`json:"id"`
 	Keyword         []*Keyword	`json:"-"`
 	Content         string		`json:"content"`
-	Frequency	float32		`json:"frequency"`
+	Frequency	float32		`json:"frequency"`  // 这个是搜索查询用到的，后面需要去掉
+	TextRank 	float32		`json:"text_rank"`  // 这个是搜索查询用到的，后面需要去掉
 }
 
 type Keyword struct {
 	Text 		string	 	`json:"text"`
 	Frequency  	float32		`json:"frequency"`
+	TextRank	float32		`json:"text_rank"`
 }
 
 // 反向索引表的一行，收集了一个关键字出现的所有文档，按照DocId从小到大排序。
@@ -28,6 +30,7 @@ type Keyword struct {
 type KeywordIndices struct {
 	DocIds      []uint64
 	Frequencys  []float32
+	TextRank    []float32
 }
 
 func (this *Indexer) Init() {
@@ -60,12 +63,18 @@ func (this *Indexer) AddDocument(document *Document) {
 				indices.Frequencys = append(indices.Frequencys, 0)
 				copy(indices.Frequencys[pos + 1:], indices.Frequencys[pos:])
 				indices.Frequencys[pos] = word.Frequency
+
+				indices.TextRank = append(indices.TextRank, 0)
+				copy(indices.TextRank[pos + 1:], indices.TextRank[pos:])
+				indices.TextRank[pos] = word.TextRank
+
 			}
 		} else {
 			// 不存在的话，直接添加
 			ti := KeywordIndices{}
 			ti.DocIds = []uint64{document.DocId}
 			ti.Frequencys = []float32{word.Frequency}
+			ti.TextRank = []float32{word.TextRank}
 			this.Map[word.Text] = &ti
 		}
 	}

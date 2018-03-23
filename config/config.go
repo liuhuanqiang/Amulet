@@ -8,10 +8,10 @@ import (
 )
 
 type GlobalConfig struct {
-	UserName	string 		`json:"user_name"`
+	UserName	string 		`json:"username"`
 	Password	string		`json:"password"`
-	Port  		string		`json:"port"`
-	Table       string		`json:"table"`
+	Port  		int		`json:"port"`
+	Table           string		`json:"table"`
 }
 
 var (
