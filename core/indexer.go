@@ -21,8 +21,8 @@ type Document struct {
 
 type Keyword struct {
 	Text 		string	 	`json:"text"`
-	Frequency  	float32		`json:"frequency"`
-	TextRank	float32		`json:"text_rank"`
+	Frequency  	float32		`json:"frequency"`  // 每个关键字，在这个文章中的词频
+	TextRank	float32		`json:"text_rank"`  // 每个关键字，在这个文章中的TextRank
 }
 
 // 反向索引表的一行，收集了一个关键字出现的所有文档，按照DocId从小到大排序。

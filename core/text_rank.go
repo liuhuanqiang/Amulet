@@ -40,6 +40,7 @@ func (this *TextRank) GetRankList(terms []string) map[string]float32 {
 	return scores
 }
 
+// 判断是否已经在这个列表中了
 func (this *TextRank) isContain(terms []string, term string) bool {
 	for _, v := range terms {
 		if v == term {
