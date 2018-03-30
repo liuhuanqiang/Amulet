@@ -11,11 +11,14 @@ func main() {
 	flag.Parse()
 	//eg := engine.Engine{}
 	//eg.Init()
-	str := "Object.observe已经官方声明废弃，当然这也是在情理之中的，因为这个属性不可预测性太高。但是这并不意味着拥有一个可以观察的对象是一件坏事。事实上，可观察对象是一个非常强大的概念。别担心，"
+	str := ""
 	seg := &segment.Segment{}
 	seg.Init()
 	ret := seg.SplitToSegment([]byte(str))
-	glog.Info(ret)
+	for _, v := range ret {
+		glog.Info(seg.MaxReverse(v))
+	}
+
 	glog.Flush()
 }
 

@@ -139,29 +139,45 @@ func (this *Segment) SplitToSegment(text []byte) []string{
 	return output
 }
 
-//最大逆向匹配
-func (this *Segment) MaxReverse(str string) {
+
+//最大逆向匹配算法
+func (this *Segment) MaxReverse(str string) []string{
 	// 将字符串转化成byte
-	text := []byte(str)
+	runes := []rune(str)
 	current := 0
-	right := len(text)
+	right := len(runes)
 	left := 0
 	output := []string{}
-	for right > 0 {
+	r, size := utf8.DecodeRune([]byte(str)[left:])
+	// 如果是英文字母
+	if size <= 2 && (unicode.IsLetter(r) || unicode.IsNumber(r)) {
+		output = append(output, str)
+		return output
+	}
+	length := 0
+	for right > 0{
 		// 取出第一个文字
-		_, size := utf8.DecodeRune(text[left:])
-		current += size
-		leftText := text[current:right] // 剩下的文字
+		leftText := runes[current:right] // 剩下的文字
 		if this.isTextExist(string(leftText)) {
 			// 如果文本存在
 			output = append(output, string(leftText))
 			right = current
 			current = 0
+			length++
 		} else {
-			// 如果文本不存在  1.剩下一个汉字  2. 英文单词
-
+			// 如果文本不存在 剩下一个汉字
+			if len(leftText) <= 1 {
+				output = append(output, string(leftText))
+				length++
+			}
+			current++
 		}
 	}
+	ret := make([]string, length)
+	for i := 0; i < length; i++ {
+		ret[i] = output[length - i - 1]
+	}
+	return ret
 }
 
 // 将英文词转化为小写
