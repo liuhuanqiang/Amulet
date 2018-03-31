@@ -15,6 +15,11 @@ type Segment struct {
 	Dict           map[string]bool
 }
 
+type Node struct {
+	From   int
+	To     int
+	Cost   float32
+}
 
 func (this *Segment) Init() {
 	this.Interpunction = make(map[string]bool)
@@ -178,6 +183,46 @@ func (this *Segment) MaxReverse(str string) []string{
 		ret[i] = output[length - i - 1]
 	}
 	return ret
+}
+
+// N最短路径算法  1.找出字符串中所有可能的词，构造词切分有向无环图  2.寻找最短路径
+// 分析每一个字，找出以这个字开头的所有词语
+func (this *Segment) NShort(str string) [][]string {
+	output := [][]string{}
+	// 将字符串转换为rune
+	runes := []rune(str)
+	// 分析每一个字，找出以这个字开头的所有词语
+	offset := 1
+	for offset < len(runes) {
+		i := 0
+		for i < len(runes) {
+			list := []string{}
+			for j := i + offset; j <= len(runes); j++ {
+				text := runes[i:j]
+				glog.Info("len:", len(runes), " i:", i, " j:", j, " offset:",offset,"  text:", string(text))
+				if this.isTextExist(string(text)) {
+					list = append(list, string(text))
+					i = j
+					offset = 0
+				}
+			}
+			output = append(output, list)
+			offset++
+			glog.Info("2222:",i)
+			if offset >= len(runes) {
+				break
+			}
+		}
+		glog.Info("111")
+	}
+	glog.Info(output)
+	// 构建有向无环图
+	return output
+}
+
+// 转成一个句子  递归
+func (this *Segment) toSentence() {
+
 }
 
 // 将英文词转化为小写

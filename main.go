@@ -11,14 +11,10 @@ func main() {
 	flag.Parse()
 	//eg := engine.Engine{}
 	//eg.Init()
-	str := ""
 	seg := &segment.Segment{}
 	seg.Init()
-	ret := seg.SplitToSegment([]byte(str))
-	for _, v := range ret {
-		glog.Info(seg.MaxReverse(v))
-	}
-
+	ret := seg.NShort("商品和服务")
+	glog.Info(ret)
 	glog.Flush()
 }
 
