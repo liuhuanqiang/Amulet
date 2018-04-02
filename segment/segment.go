@@ -124,7 +124,7 @@ func (this *Segment) SplitToSegment(text []byte) []string{
 					output = append(output, string(toLower(text[alphanumericStart:current])))
 				}
 			} else {
-				if this.isInterpution(string(r)) {
+				if this.isInterpution(string(r)) || r == 12288 {
 					if len(tmp) > 0 {
 						output = append(output, tmp)
 					}
@@ -145,9 +145,9 @@ func (this *Segment) SplitToSegment(text []byte) []string{
 			output = append(output, string(toLower(text[alphanumericStart:current])))
 		}
 	}
-	for _, v :=range output {
-		glog.Info(v)
-	}
+	//for _, v :=range output {
+	//	glog.Info(v)
+	//}
 	return output
 }
 
