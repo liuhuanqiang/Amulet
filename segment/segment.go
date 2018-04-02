@@ -13,12 +13,19 @@ import (
 type Segment struct {
 	Interpunction  map[string]bool
 	Dict           map[string]bool
+	Graph          [][]*Node
 }
 
 type Node struct {
 	From   int
 	To     int
 	Cost   float32
+	Text   string
+}
+
+type Token struct {
+	Text  	string
+	Weight  float32
 }
 
 func (this *Segment) Init() {
@@ -192,37 +199,54 @@ func (this *Segment) NShort(str string) [][]string {
 	// 将字符串转换为rune
 	runes := []rune(str)
 	// 分析每一个字，找出以这个字开头的所有词语
-	offset := 1
-	for offset < len(runes) {
-		i := 0
-		for i < len(runes) {
-			list := []string{}
-			for j := i + offset; j <= len(runes); j++ {
-				text := runes[i:j]
-				glog.Info("len:", len(runes), " i:", i, " j:", j, " offset:",offset,"  text:", string(text))
-				if this.isTextExist(string(text)) {
-					list = append(list, string(text))
-					i = j
-					offset = 0
-				}
-			}
-			output = append(output, list)
-			offset++
-			glog.Info("2222:",i)
-			if offset >= len(runes) {
-				break
+	for i := 0; i < len(runes); i++ {
+		list := []string{}
+		for j := i + 1; j <= len(runes); j++ {
+			text := runes[i:j]
+			if this.isTextExist(string(text)) {
+				list = append(list, string(text))
 			}
 		}
-		glog.Info("111")
+		output = append(output, list)
 	}
-	glog.Info(output)
 	// 构建有向无环图
+	this.Graph = [][]*Node{}
+	if len(output) > 0 {
+		for _, v := range output[0] {
+			var ret []*Node
+			node := &Node{}
+			node.Text = v
+			node.From = 0
+			node.To = len([]rune(v))
+			this.buildNode(node, output, len([]rune(v)), ret)
+			glog.Info(ret)
+		}
+	}
+	glog.Info(this.Graph)
+	// 计算最短路径
+
 	return output
 }
 
-// 转成一个句子  递归
-func (this *Segment) toSentence() {
-
+//
+func (this *Segment) buildNode(node *Node, output [][]string, from int, ret []*Node) {
+	if from >= len(output) {
+		ret = append(ret, node)
+		for _,v := range ret {
+			glog.Info("v:",v)
+		}
+		this.Graph = append(this.Graph,ret)
+		return
+	}
+	ret = append(ret, node)
+	for _, v := range output[from] {
+		//glog.Info("v:",v)
+		node := &Node{}
+		node.Text = v
+		node.From = from
+		node.To = len([]rune(v)) + from
+		this.buildNode(node, output, len([]rune(v)) + from, ret)
+	}
 }
 
 // 将英文词转化为小写
