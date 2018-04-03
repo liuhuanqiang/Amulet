@@ -23,10 +23,6 @@ type Node struct {
 	Text   string
 }
 
-type Token struct {
-	Text  	string
-	Weight  float32
-}
 
 func (this *Segment) Init() {
 	this.Interpunction = make(map[string]bool)
