@@ -102,13 +102,16 @@ func (this *Segment) isTextExist(str string) bool {
 	}
 }
 
-func (this *Segment) Cut(text []byte) [][]string{
+func (this *Segment) Cut(text []byte) []string{
 	//glog.Info("text:", string(text))
 	terms := this.SplitToSegment(text)
-	ret := [][]string{}
+	ret := []string{}
 	for _, term := range terms {
 		tmp := this.MaxReverse(term)
-		ret = append(ret, tmp)
+		for _, s := range tmp {
+			ret = append(ret, s)
+		}
+
 	}
 	return ret
 }
