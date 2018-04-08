@@ -87,7 +87,7 @@ func (this *TextRank) isContain(terms []string, term string) bool {
 // 获取文章中简介语句
 // 获取第一个p的标签, 直到后面不是p的标签结束
 func (this *TextRank) GetSummary(article string) string {
-	 doc, err := goquery.NewDocumentFromReader(strings.NewReader(article))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(article))
 	if err != nil {
 		glog.Info("GetSummary error:", err.Error())
 	}
@@ -110,5 +110,5 @@ func (this *TextRank) GetSummary(article string) string {
 	for _, v := range ret {
 		str += v
 	}
-	return str
+	return strings.TrimSpace(str)
 }

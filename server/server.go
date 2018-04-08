@@ -13,6 +13,7 @@ type Server struct {
 	Seg   *segment.Segment
 	TextRank  *core.TextRank
 	StopToken  *core.StopToken
+	Html2MD   *segment.Html2MD
 }
 
 const (
@@ -33,11 +34,12 @@ func (this *Server) Start() {
 	this.TextRank = &core.TextRank{}
 	this.StopToken = &core.StopToken{}
 	this.StopToken.Init()
-
+	this.Html2MD = &segment.Html2MD{}
 
 	http.HandleFunc("/getRankList", this.GetRankList)
 	http.HandleFunc("/cut", this.Cut)
 	http.HandleFunc("/getSummary", this.GetSummary)
+	http.HandleFunc("/html2md", this.getMDByHtml)
 
 	glog.Info("端口8081: 启动成功")
 	http.ListenAndServe(":8081", nil)
@@ -82,6 +84,20 @@ func (this *Server) GetSummary(w http.ResponseWriter, r *http.Request) {
 	glog.Info("text:", ret.Data, "   cost:", time.Since(startTime))
 	this.RenderJson(w,ret)
 }
+
+func (this *Server)getMDByHtml(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	article := r.FormValue("article")
+	this.Html2MD.Change(article)
+	ret := &Resp{}
+	ret.Code = Success
+	ret.Data = "test"
+	ret.Msg = "成功"
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
+	glog.Info("text:", ret.Data, "   cost:", time.Since(startTime))
+	this.RenderJson(w,ret)
+}
+
 
 func (this *Server)RenderJson(w http.ResponseWriter, v interface{}) {
 	bs, err := json.Marshal(v)
