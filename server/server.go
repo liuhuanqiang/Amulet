@@ -87,8 +87,9 @@ func (this *Server) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 func (this *Server)getMDByHtml(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
-	article := r.FormValue("article")
-	this.Html2MD.Change(article)
+	url := r.FormValue("url")
+	host := url
+	this.Html2MD.Change(url, host)
 	ret := &Resp{}
 	ret.Code = Success
 	ret.Data = "test"
