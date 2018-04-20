@@ -89,10 +89,9 @@ func (this *Server)getMDByHtml(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	url := r.FormValue("url")
 	host := url
-	this.Html2MD.Change(url, host)
 	ret := &Resp{}
 	ret.Code = Success
-	ret.Data = "test"
+	ret.Data = this.Html2MD.Change(url, host)
 	ret.Msg = "成功"
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
 	glog.Info("text:", ret.Data, "   cost:", time.Since(startTime))

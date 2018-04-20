@@ -269,38 +269,9 @@ func (this *Html2MD) regOther(article string) string {
 	return  article
 }
 
-func (this *Html2MD) Change(url string, host string) {
+func (this *Html2MD) Change(url string, host string) string {
 	glog.Info("url:", url, " host:",host, " getHost:", this.getHost(url))
-	ret := this.getHtml(url)
-	switch this.getHost(url) {
-		case Host_ZhiHu:
-			ret = this.getZhiHuContent(ret)
-			break
-		case Host_JianShu:
-			ret = this.getJianShuContent(ret)
-			break
-		case Host_Other:
-			ret = this.getHexoContent(ret)
-			break
-	}
-	glog.Info(ret)
-	ret = this.regAnno(ret)
-	ret = this.regOther(ret)
-	ret = this.regScript(ret)
-	ret = this.regStyle(ret)
-	ret = this.regArticle(ret)
-	ret = this.regDiv(ret)
-	ret = this.regSpan(ret)
-	ret = this.regH(ret)
-	ret = this.regLink(ret, host)
-	ret = this.regImg(ret, host)
-	ret = this.regLi(ret)
-	ret = this.regCode(ret)
-	ret = this.regP(ret)
-	ret = this.regUl(ret)
-	ret = this.regStrong(ret)
-
-	glog.Info(ret)
+	return this.getJianShuContent(this.getHtml(url));
 }
 
 // 获取链接的host, 针对不同的host,截取不同的值。 比如知乎， 简书 ，博客 hexo wordprss,
@@ -342,10 +313,9 @@ func (this *Html2MD) getZhiHuContent(html string) string {
 func (this *Html2MD) getJianShuContent(html string) string {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(html))
 	str,_ := doc.Find(".article").Html()
+	// 过滤掉div
+	str = this.regDiv(str)
+	str = this.regAnno(str)
+	str = strings.Replace(str, "\n", "", -1)
 	return str
-}
-
-// 获取hexo的
-func (this *Html2MD) getHexoContent(html string) string {
-	return html
 }
