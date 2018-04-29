@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"amulet/server"
+	"amulet/web"
 	"github.com/golang/glog"
 )
 
@@ -10,7 +10,7 @@ import (
 
 func main() {
 	flag.Parse()
-	server := &server.Server{}
+	server := &web.Server{}
 	server.Start()
 	glog.Flush()
 }

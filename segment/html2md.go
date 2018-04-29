@@ -269,9 +269,13 @@ func (this *Html2MD) regOther(article string) string {
 	return  article
 }
 
-func (this *Html2MD) Change(url string, host string) string {
+func (this *Html2MD) Change(url string, host string) (string, string) {
 	glog.Info("url:", url, " host:",host, " getHost:", this.getHost(url))
-	return this.getJianShuContent(this.getHtml(url));
+	if this.getHost(url) == Host_JianShu {
+		return this.getJianShuContent(this.getHtml(url));
+	} else {
+		return this.getZhiHuContent(this.getHtml(url));
+	}
 }
 
 // 获取链接的host, 针对不同的host,截取不同的值。 比如知乎， 简书 ，博客 hexo wordprss,
@@ -304,18 +308,27 @@ func (this *Html2MD) getHtml(url string) string {
 }
 
 // 获取正文，去掉广告， 推荐 等无用信息
-func (this *Html2MD) getZhiHuContent(html string) string {
-	reg := regexp.MustCompile(`(?sU:<article.*>)(?s:.*?)(?U:</article>)`)
-	return reg.FindString(html)
+func (this *Html2MD) getZhiHuContent(html string) (string, string) {
+	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(html))
+
+	title, _ := doc.Find(".Post-Title").Html();
+	str, _ := doc.Find(".Post-RichText").Html()
+	str = this.regScript(str);
+	str = this.regSpan(str)
+	return title, str
 }
 
 // 获取简书的
-func (this *Html2MD) getJianShuContent(html string) string {
+func (this *Html2MD) getJianShuContent(html string) (string, string) {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(html))
-	str,_ := doc.Find(".article").Html()
+	title,_ := doc.Find(".title").Html();
+	str,_ := doc.Find(".show-content").Html()
 	// 过滤掉div
 	str = this.regDiv(str)
 	str = this.regAnno(str)
-	str = strings.Replace(str, "\n", "", -1)
-	return str
+	return title, str
+}
+
+func (this *Html2MD) getCNBlogContent(html string) (string,string) {
+
 }
