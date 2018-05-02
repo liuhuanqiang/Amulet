@@ -14,6 +14,36 @@ type Resp struct {
 	Msg     string   	`json:"msg"`
 }
 
+type LatestListReq struct {
+	Page	int	`json:"page"`
+}
+
+
+type LastetListResp struct{
+	Current		int		`json:"current"`
+	List		[]*LatestResp 	`json:"list"`
+
+}
+
 type LatestResp struct {
-	Current     int   `json:"current"`
+	Fid    		int 		`json:"fid"`
+	Name   		string 		`json:"name"`
+	Avater  	string  	`json:"avatar"`
+	Title		string		`json:"title"`
+	Description     string 		`json:"description"`
+	Linkid		string 		`json:"linkid"`
+	Source  	int 		`json:"source"`
+	PubDate		int		`json:"pub_date"`
+}
+
+
+type ArticleReq struct {
+	Linkid		string 		`json:"linkid"`
+	Source  	int		`json:"source"`
+}
+
+type ArticleResp struct {
+	Title		string 		`json:"title"`
+	Content		string		`json:"content"`
+	Url 		string 		`json:"url"`
 }

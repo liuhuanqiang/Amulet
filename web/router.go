@@ -18,7 +18,7 @@ type Router struct {
 func (this *Router) StartHttp() {
 	this.RouterMap = make(map[string]interface{})
 	this.RouterMap["content"] = &domain.Content{}
-	http.HandleFunc("/index",this.route)
+	http.HandleFunc("/index/",this.route)
 	http.ListenAndServe(":8888", nil)
 }
 
