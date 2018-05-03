@@ -8,15 +8,13 @@ import (
 	"github.com/golang/glog"
 	"github.com/PuerkitoBio/goquery"
 	"strings"
-	"net/http"
-	"fmt"
-	"io/ioutil"
 	"amulet/utils"
-	"bytes"
+
+	"amulet/web/service"
 )
 
 type Content struct {
-
+	Service  *service.ServiceContent
 }
 
 const (
@@ -25,6 +23,9 @@ const (
 	Source_ZhiHu = 3
 )
 
+func (this *Content) Init() {
+	this.Service = &service.ServiceContent{}
+}
 /**
 	获取最新的文章的列表
  */
@@ -90,29 +91,7 @@ func (this *Content) GetArticle(str string) interface{} {
 
 		resp := &msg.ArticleResp{}
 		resp.Url = url
-		if fid == 1 {
-			resp.Title, resp.Content = this.getContent1(url)
-		} else if fid == 2 {
-			resp.Title, resp.Content = this.getContent2(url)
-		} else if fid == 7 || fid == 10 {
-			resp.Title, resp.Content = this.getContent7(url)
-		} else if fid == 11 {
-			resp.Title, resp.Content = this.getContent11(url)
-		} else if fid == 13 {
-			resp.Title, resp.Content = this.getContent13(url)
-		} else if fid == 14 {
-			resp.Title, resp.Content = this.getContent14(url)
-		} else if fid == 16 {
-			resp.Title, resp.Content = this.getContent16(url)
-		} else if fid == 17 {
-			resp.Title, resp.Content = this.getContent17(url)
-		} else if fid == 19 || fid == 22 || fid == 23 {
-			resp.Title, resp.Content = this.getCSDNContent(url)
-		} else if fid == 34 {
-			resp.Title, resp.Content = this.getContent34(url)
-		} else {
-			resp.Title, resp.Content = this.getHexoContent(url)
-		}
+		resp.Title, resp.Content = this.Service.GetContent(fid, url)
 		return resp
 	} else if req.Source == Source_ZhiHu {
 		_, url := db.GetDB().GetLink("tb_zhihu", req.Linkid)
@@ -148,178 +127,3 @@ func (this *Content) GetArticle(str string) interface{} {
 	}
 }
 
-func (this *Content) getResponse (url string) *http.Response {
-	client := &http.Client{}
-	req, _ := http.NewRequest("GET", url, bytes.NewReader([]byte("")));
-	req.Header.Set("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36")
-	resp, _ := client.Do(req)
-	return resp
-}
-
-func (this *Content) getHtml(url string) string {
-	resp, err := http.Get(url)
-	if err != nil {
-		fmt.Println("http get error.")
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("http read error")
-	}
-	return string(body)
-}
-
-func (this *Content) GetContent(url string) (string, string) {
-	return this.getContent24(url)
-}
-
-func (this *Content) getHexoContent(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title, _ := doc.Find("article").Find("h1").Html()
-	str, _ := doc.Find("article").Find(".entry").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
-}
-
-// http://rango.swoole.com/
-func (this *Content) getContent1(url string) (string, string){
-	doc, _ := goquery.NewDocument(url)
-	title,_ := doc.Find(".post").Find("h2").Html();
-	str,_ := doc.Find(".post").Find(".content").Html()
-
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return title, strings.TrimSpace(str)
-}
-
-// http://www.laruence.com/
-func (this *Content) getContent2(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title,_ := doc.Find(".content").Find("h1").Find("a").Html();
-	str,_ := doc.Find(".content").Find(".post").Each(func(_ int, tag *goquery.Selection) {
-		tag.Find("h1").Remove()
-		tag.Find(".related_post_title").Remove()
-		tag.Find(".related_post").Remove()
-		tag.Find(".postmeta").Remove()
-		tag.Find(".bds_more").Remove()
-		tag.Find(".bds_qzone").Remove()
-		tag.Find(".bds_tsina").Remove()
-		tag.Find(".bds_tqq").Remove()
-		tag.Find(".bds_renren").Remove()
-		tag.Find(".shareCount").Remove()
-	}).Html()
-
-	str = utils.RegDiv(str)
-	str = utils.RegH1(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-
-	return title, strings.TrimSpace(str)
-}
-
-func (this *Content) getContent34(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title, _ := doc.Find("article").Find("h1").Html()
-	str, _ := doc.Find("article").Find(".article-entry").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent7(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title, _ := doc.Find("article").Find("h1").Html()
-	str, _ := doc.Find("article").Find(".entry-content").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent11(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title, _ := doc.Find("h1").Html()
-	str, _ := doc.Find(".container.typo").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent13(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title, _ := doc.Find("section").Find("h1").Html()
-	str, _ := doc.Find("section").Each(func(_ int, tag *goquery.Selection) {
-		tag.Find("h1").Remove()
-		tag.Find("p").Each(func(_ int, p *goquery.Selection){
-			s, _ := p.Html()
-			glog.Info("str:",s)
-			if strings.Contains(s, "友金所") || strings.Contains(s, "下一篇") ||strings.Contains(s, "上一篇") {
-				p.Remove()
-			}
-		})
-
-	}).Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent14(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title := doc.Find("article").Find("h1").Text();
-	str,_ := doc.Find("article").Find(".article-content").Each(func(_ int, tag *goquery.Selection) {
-		tag.Find(".toc-article").Remove()
-	}).Html()
-
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(title), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent16(url string) (string, string) {
-	doc, _ := goquery.NewDocument(url)
-	title := doc.Find(".content").Find(".page-header").Find("h1").Text()
-	str, _ := doc.Find("#article").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(title), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent17(url string) (string, string) {
-
-	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
-	title,_ := doc.Find(".x-center").Find(".x-content").Find("h3").Html()
-	str, _ := doc.Find(".x-center").Find(".x-article-content.x-main-content").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(title), strings.TrimSpace(str)
-}
-
-func (this *Content) getCSDNContent(url string) (string,string){
-	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
-	title,_ := doc.Find(".title-article").Html()
-	str, _ := doc.Find("article").Find(".article_content").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(title), strings.TrimSpace(str)
-}
-
-func (this *Content) getContent24(url string) (string, string) {
-	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
-	title,_ := doc.Find(".post-title").Html()
-	str, _ := doc.Find("article").Find(".post-content").Html()
-	str = utils.RegDiv(str)
-	str = utils.RegAnno(str)
-	str = utils.RegScript(str)
-	return strings.TrimSpace(title), strings.TrimSpace(str)
-}

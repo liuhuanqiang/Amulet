@@ -11,13 +11,20 @@ import (
 	"time"
 )
 
+
 type Router struct {
-	RouterMap  map[string] interface{}
+	RouterMap  map[string] Domain
+}
+
+type Domain interface {
+	Init()
 }
 
 func (this *Router) StartHttp() {
-	this.RouterMap = make(map[string]interface{})
+	this.RouterMap = make(map[string]Domain)
 	this.RouterMap["content"] = &domain.Content{}
+	this.RouterMap["content"].Init()
+
 	http.HandleFunc("/index/",this.route)
 	http.ListenAndServe(":8888", nil)
 }
