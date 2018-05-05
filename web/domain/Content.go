@@ -11,6 +11,7 @@ import (
 	"amulet/utils"
 
 	"amulet/web/service"
+	"time"
 )
 
 type Content struct {
@@ -34,7 +35,7 @@ func (this *Content) GetLatestList(str string) interface{} {
 	json.Unmarshal([]byte(str), req)
 	glog.Info("GetLatestList:", str ,"  page:" ,req.Page)
 
-	list := db.GetDB().GetLatestList(req.Page)
+	list := db.GetDB().GetLatestList(req.Page, req.Timestamp)
 	for _,item := range list {
 		item.Description = this.getSummary(item.Description)
 
@@ -46,6 +47,7 @@ func (this *Content) GetLatestList(str string) interface{} {
 	ret := &msg.LastetListResp{}
 	ret.Current = req.Page
 	ret.List = list
+	ret.Timestamp = int(time.Now().Unix())
 	return ret
 }
 

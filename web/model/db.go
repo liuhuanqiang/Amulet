@@ -145,7 +145,7 @@ func (this *MysqlDB) GetJianShu() []Jianshu {
 	return ret
 }
 
-func (this *MysqlDB) GetLatestList(page int) []*msg.LatestResp {
+func (this *MysqlDB) GetLatestList(page int, timestamp int) []*msg.LatestResp {
 	tpl := "select fid,name, avater, title, description, linkid, source, pub_date from (" +
 			"(" +
 				"select tb_blog.fid as fid, tb_blog.title as title, tb_blog.description as description, tb_blog.linkid as linkid, tb_blog.source as source, tb_blog.pub_date as pub_date from tb_blog" +
@@ -157,8 +157,25 @@ func (this *MysqlDB) GetLatestList(page int) []*msg.LatestResp {
 				"select tb_jianshu.fid as fid, tb_jianshu.title as title, tb_jianshu.description as description, tb_jianshu.linkid as linkid, tb_jianshu.source as source, tb_jianshu.pub_date as pub_date from tb_jianshu" +
 			")" +
 		") as tb left join tb_famous on tb.fid = tb_famous.id order by `pub_date` desc limit %d,%d"
-
 	sql := fmt.Sprintf(tpl, (page - 1)*20, page*20)
+
+	if page == 0 {
+		// 下拉刷新
+		tpl = "select fid,name, avater, title, description, linkid, source, pub_date from (" +
+			"(" +
+			"select tb_blog.fid as fid, tb_blog.title as title, tb_blog.description as description, tb_blog.linkid as linkid, tb_blog.source as source, tb_blog.pub_date as pub_date from tb_blog" +
+			")" +
+			"union all (" +
+			"select tb_zhihu.fid as fid, tb_zhihu.title as title, tb_zhihu.description as description, tb_zhihu.linkid as linkid, tb_zhihu.source as source, tb_zhihu.pub_date as pub_date from tb_zhihu where verb = 'MEMBER_CREATE_ARTICLE'" +
+			") " +
+			"union all (" +
+			"select tb_jianshu.fid as fid, tb_jianshu.title as title, tb_jianshu.description as description, tb_jianshu.linkid as linkid, tb_jianshu.source as source, tb_jianshu.pub_date as pub_date from tb_jianshu" +
+			")" +
+			") as tb left join tb_famous on tb.fid = tb_famous.id where `pub_date` > %d order by `pub_date` desc"
+		sql = fmt.Sprintf(tpl, timestamp)
+
+	}
+	glog.Info("sql:", sql)
 	rows,err := this.DB.Query(sql)
 	defer rows.Close()
 	if err!=nil{

@@ -31,11 +31,25 @@ func TestServiceContent_GetContent(t *testing.T) {
 	//url := "http://fex.baidu.com/blog/2018/04/fex-weekly-30/"
 	//url := "http://taobaofed.org/blog/2018/03/12/long-list-in-rax/"
 	//url := "https://wusay.org/skiplist.html"
-	url := "http://yulingtianxia.com/blog/2018/03/31/Track-Block-Arguments-of-Objective-C-Method/"
-
+	//url := "http://yulingtianxia.com/blog/2018/03/31/Track-Block-Arguments-of-Objective-C-Method/"
+	//url := "http://blog.leichunfeng.com/blog/2017/02/20/talking-about-the-decompression-of-the-image-in-ios/"
+	//url := "http://blog.startry.com/2017/01/10/2016-conclusion/"
+	//url := "http://www.iosxxx.com/blog/2017-09-29-OpenGLES%E4%B9%8B%E5%9F%BA%E7%A1%80%E7%AF%87.html"
+	//url := "http://blog.raozhizhen.com/post/2016-08-19"
+	//url := "http://msching.github.io/blog/2016/05/24/audio-in-ios-9/"
+	//url := "http://coderyi.com/posts/weex3/"
+	//url := "https://casatwy.com/Advance_In_iOS11_Networking.html"
+	//url := "http://blog.cnbang.net/writting/3565/"
+	//url := "http://f2e.souche.com/blog/webpackbian-yi-vuexiang-mu-sheng-cheng-de-dai-ma-tan-suo/"
+	//url := "https://75team.com/post/webview-debug.html"
+	//url := "http://singsing.io/blog/fcc/advanced-pairwise/"
+	//url := "https://imququ.com/post/reduce-ttfb-on-thinkjs3-website.html"
+	//url := "https://luolei.org/terramaster-d2-310-review/"
+	//url := "https://lukesign.com/disable-wechat-font-adjust/"
+	url := "http://ued.ctrip.com/?p=5657"
 
 	content := &ServiceContent{}
-	title, des := content.GetContent(50,url)
+	title, des := content.GetContent(79,url)
 	fmt.Println(title)
 	fmt.Println(des)
 }

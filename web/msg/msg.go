@@ -16,13 +16,14 @@ type Resp struct {
 
 type LatestListReq struct {
 	Page	int	`json:"page"`
+	Timestamp int	`json:"timestamp"`
 }
 
 
 type LastetListResp struct{
 	Current		int		`json:"current"`
 	List		[]*LatestResp 	`json:"list"`
-
+	Timestamp	int		`json:"timestamp"`
 }
 
 type LatestResp struct {
