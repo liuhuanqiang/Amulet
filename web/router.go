@@ -29,6 +29,7 @@ func (this *Router) StartHttp() {
 	http.ListenAndServe(":8888", nil)
 }
 
+// http://localhost:8888/index/*?s=content.GetLatestList&param={%22page%22:2}
 func (this *Router)route(w http.ResponseWriter,r *http.Request) {
 	startTime := time.Now()
 	s := r.FormValue("s")

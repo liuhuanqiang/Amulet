@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"bytes"
 	"amulet/utils"
+	"github.com/axgle/mahonia"
 )
 
 type ServiceContent struct {
@@ -24,6 +25,8 @@ func (this *ServiceContent) GetContent(fid int, url string) (string, string) {
 		title, content = this.getContent1(url)
 	} else if fid == 2 {
 		title, content = this.getContent2(url)
+	} else if fid == 6 {
+		title, content = this.getContent6(url)
 	} else if fid == 7 || fid == 10  {
 		title, content = this.getContent7(url)
 	} else if fid == 11 {
@@ -36,6 +39,8 @@ func (this *ServiceContent) GetContent(fid int, url string) (string, string) {
 		title, content = this.getContent16(url)
 	} else if fid == 17 {
 		title, content = this.getContent17(url)
+	} else if fid == 18 {
+		title, content = this.getContent18(url)
 	} else if fid == 19 || fid == 22 || fid == 23 {
 		title, content = this.getCSDNContent(url)
 	} else if fid == 27 {
@@ -118,6 +123,22 @@ func (this *ServiceContent) GetContent(fid int, url string) (string, string) {
 		title, content = this.getHexoContent(url)
 	} else if fid == 79 {
 		title, content = this.getContent79(url)
+	} else if fid == 80 {
+		title, content = this.getContent80(url)
+	} else if fid == 82 {
+		//todo
+	} else if fid == 83 {
+		title, content = this.getHexoContent(url)
+	} else if fid == 84 {
+		// todo
+	} else if fid == 85 {
+		title, content = this.getHuxContent(url)
+	} else if fid == 86 {
+		title, content = this.getHexoContent(url)
+	} else if fid == 87 {
+		title, content = this.getHexoContent(url)
+	} else if fid == 88 {
+		title, content = this.getContent88(url)
 	} else {
 		// fid = 54
 		title, content = this.getHexoContent(url)
@@ -150,7 +171,7 @@ func (this *ServiceContent) getHtml(url string) string {
 
 func (this *ServiceContent) getHexoContent(url string) (string, string) {
 	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
-	title, _ := doc.Find("article").Find("post-title").Html()
+	title := doc.Find("article").Find(".post-title").Text()
 	str, _ := doc.Find("article").Find(".post-body").Html()
 	str = utils.RegDiv(str)
 	str = utils.RegAnno(str)
@@ -371,6 +392,18 @@ func (this *ServiceContent) getContent34(url string) (string, string) {
 	return strings.TrimSpace(strings.Replace(title,"\n","",0)), strings.TrimSpace(str)
 }
 
+func (this *ServiceContent) getContent6(url string) (string, string) {
+	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
+	title := doc.Find(".entry").Find(".entry-header").Text();
+	str,_ := doc.Find(".entry").Find(".entry-content").Html()
+	str = utils.RegDiv(str)
+	str = utils.RegAnno(str)
+	str = utils.RegScript(str)
+	str = utils.RegSpan(str)
+	dec := mahonia.NewDecoder("gbk")
+	return strings.TrimSpace(dec.ConvertString(title)), strings.TrimSpace(dec.ConvertString(str))
+}
+
 func (this *ServiceContent) getContent7(url string) (string, string) {
 	doc, _ := goquery.NewDocument(url)
 	title, _ := doc.Find("article").Find("h1").Html()
@@ -444,6 +477,19 @@ func (this *ServiceContent) getContent17(url string) (string, string) {
 	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
 	title,_ := doc.Find(".x-center").Find(".x-content").Find("h3").Html()
 	str, _ := doc.Find(".x-center").Find(".x-article-content.x-main-content").Html()
+	str = utils.RegDiv(str)
+	str = utils.RegAnno(str)
+	str = utils.RegScript(str)
+	str = utils.RegSpan(str)
+	return strings.TrimSpace(title), strings.TrimSpace(str)
+}
+
+func (this *ServiceContent) getContent18(url string) (string, string) {
+	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
+	title,_ := doc.Find(".middle.mdl-layout__content ").Find("h2").Html()
+	str, _ := doc.Find(".mdl-card__supporting-text").Each(func(_ int, tag *goquery.Selection) {
+		tag.Find("span.post-meta").Remove()
+	}).Html()
 	str = utils.RegDiv(str)
 	str = utils.RegAnno(str)
 	str = utils.RegScript(str)
@@ -814,5 +860,43 @@ func (this *ServiceContent) getContent79(url string) (string, string) {
 	str = utils.RegAnno(str)
 	str = utils.RegScript(str)
 	str = utils.RegSpan(str)
+	return strings.TrimSpace(title), strings.TrimSpace(str)
+}
+
+// https://aotu.io/notes/2018/04/24/jdindex_2017/
+func (this *ServiceContent) getContent80(url string) (string, string) {
+	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
+	title := doc.Find("article").Find(".post-tit").Text()
+	str, _ := doc.Find("article").Find(".post-content").Html()
+	str = utils.RegDiv(str)
+	str = utils.RegAnno(str)
+	str = utils.RegScript(str)
+	str = utils.RegSpan(str)
+	str = utils.RegStyle(str)
+	return strings.TrimSpace(title), strings.TrimSpace(str)
+}
+
+//https://blog.qiniu.com/archives/8728
+func (this *ServiceContent) getContent88(url string) (string, string) {
+	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
+	title := doc.Find(".blog-content").Find(".entry-title").Text()
+	str, _ := doc.Find(".blog-content").Find(".blog-html").Html()
+	str = utils.RegDiv(str)
+	str = utils.RegAnno(str)
+	str = utils.RegScript(str)
+	str = utils.RegSpan(str)
+	str = utils.RegStyle(str)
+	return strings.TrimSpace(title), strings.TrimSpace(str)
+}
+
+func (this *ServiceContent) getContent89(url string) (string, string) {
+	doc, _ := goquery.NewDocumentFromResponse(this.getResponse(url))
+	title := doc.Find("article").Find(".article-title").Text()
+	str, _ := doc.Find(".blog-content").Find(".blog-html").Html()
+	str = utils.RegDiv(str)
+	str = utils.RegAnno(str)
+	str = utils.RegScript(str)
+	str = utils.RegSpan(str)
+	str = utils.RegStyle(str)
 	return strings.TrimSpace(title), strings.TrimSpace(str)
 }

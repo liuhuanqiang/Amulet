@@ -37,8 +37,9 @@ func (this *Content) GetLatestList(str string) interface{} {
 
 	list := db.GetDB().GetLatestList(req.Page, req.Timestamp)
 	for _,item := range list {
-		item.Description = this.getSummary(item.Description)
-
+		item.Description = utils.SubString(utils.ReplaceEscapeStr(this.getSummary(item.Description)),0,200)
+		item.Title = utils.ReplaceEscapeStr(item.Title)
+		glog.Info(utils.ReplaceEscapeStr(this.getSummary(item.Description)))
 		if item.Source == Source_ZhiHu && strings.Index(item.Title, "发表了文章") == 0{
 			strings.Replace(item.Title, "发表了文章", "", 0)
 		}
@@ -50,6 +51,7 @@ func (this *Content) GetLatestList(str string) interface{} {
 	ret.Timestamp = int(time.Now().Unix())
 	return ret
 }
+
 
 // 获取文章中简介语句
 // 获取第一个p的标签, 直到后面不是p的标签结束
@@ -77,6 +79,7 @@ func (this *Content) getSummary(article string) string {
 	for _, v := range ret {
 		str += v
 	}
+
 	return strings.TrimSpace(str)
 }
 

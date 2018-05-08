@@ -46,10 +46,16 @@ func TestServiceContent_GetContent(t *testing.T) {
 	//url := "https://imququ.com/post/reduce-ttfb-on-thinkjs3-website.html"
 	//url := "https://luolei.org/terramaster-d2-310-review/"
 	//url := "https://lukesign.com/disable-wechat-font-adjust/"
-	url := "http://ued.ctrip.com/?p=5657"
+	//url := "http://ued.ctrip.com/?p=5657"
+	//url := "https://aotu.io/notes/2018/04/24/jdindex_2017/"
+	//url := "http://kaedea.com/2017/04/09/android/global-accessing-context/"
+	//url := "https://blog.codingnow.com/2018/05/frostpunk.html"
+	//url := "https://www.phodal.com/blog/serverless-wechat-app-login/"
+	//url := "http://jm.taobao.org/2018/05/02/post-20180502/"
+	url := "https://blog.qiniu.com/archives/8728"
 
 	content := &ServiceContent{}
-	title, des := content.GetContent(79,url)
+	title, des := content.GetContent(88,url)
 	fmt.Println(title)
 	fmt.Println(des)
 }
