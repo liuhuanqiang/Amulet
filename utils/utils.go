@@ -105,6 +105,8 @@ func RegStyle(article string) string {
 	return reg_style.ReplaceAllString(article, "")
 }
 
+
+
 func ReplaceEscapeStr(str string) string {
 	str = strings.Replace(str, "&#34;", "\\",0)
 	str = strings.Replace(str, "&quot;", "\\", 0)

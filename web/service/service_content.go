@@ -5,23 +5,29 @@ import (
 	"strings"
 	"net/http"
 	"fmt"
-	"io/ioutil"
 	"regexp"
 	"github.com/golang/glog"
 	"bytes"
 	"amulet/utils"
 	"github.com/axgle/mahonia"
+	"golang.org/x/net/html"
+	"io"
+	"io/ioutil"
 )
 
 type ServiceContent struct {
-
+	UnLikeyCandidates *regexp.Regexp
+	RegStyle *regexp.Regexp
+	RegScript *regexp.Regexp
 }
 
 
 func (this *ServiceContent) GetContent(fid int, url string) (string, string) {
 	title:= ""
 	content := ""
-	if fid == 1 {
+	if fid == 0{
+		this.getContent(url);
+	}else if fid == 1 {
 		title, content = this.getContent1(url)
 	} else if fid == 2 {
 		title, content = this.getContent2(url)
@@ -156,16 +162,12 @@ func (this *ServiceContent) getResponse (url string) *http.Response {
 }
 
 func (this *ServiceContent) getHtml(url string) string {
-	resp, err := http.Get(url)
-	if err != nil {
-		fmt.Println("http get error.")
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("http read error")
-	}
-	return string(body)
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", url, bytes.NewReader([]byte("")));
+	req.Header.Set("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36")
+	resp, _ := client.Do(req)
+	str,_ := ioutil.ReadAll(resp.Body)
+	return string(str)
 }
 
 
@@ -899,4 +901,79 @@ func (this *ServiceContent) getContent89(url string) (string, string) {
 	str = utils.RegSpan(str)
 	str = utils.RegStyle(str)
 	return strings.TrimSpace(title), strings.TrimSpace(str)
+}
+
+func (this *ServiceContent) initRegexp(){
+	this.RegStyle = regexp.MustCompile(`(?sU:<style[\s\S]*>)([\s\S]*)(?U:</style>)`)
+	this.RegScript = regexp.MustCompile(`(?sU:<script[\s\S]*>)([\s\S]*)(?U:</script>)`)
+	this.UnLikeyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav`)
+}
+
+
+func (this *ServiceContent) removeAndGetNext(node *html.Node) *html.Node {
+	next := this.getNextNode(node, true)
+	node.Parent.RemoveChild(node)
+	return next
+}
+
+func (this *ServiceContent) getNextNode(node *html.Node, ignoreSelfAndKids bool) *html.Node {
+	if node == nil {
+		return nil
+	}
+	if !ignoreSelfAndKids && node.FirstChild != nil {
+		return node.FirstChild
+	}
+
+	if node.NextSibling != nil {
+		return node.NextSibling
+	}
+
+	for {
+		if node == nil {
+			break
+		}
+		if node != nil && node.NextSibling != nil {
+			return node.NextSibling
+		}
+		node = node.Parent
+	}
+	return nil
+}
+
+func (this *ServiceContent) getContent(url string) {
+	this.initRegexp()
+	//doc, _ := html.Parse(this.getResponse(url).Body)
+	doc := this.getHtml(url)
+	reg_body := regexp.MustCompile(`(?sU:<body[\s\S]*>)([\s\S]*)(?U:</body>)`)
+	body := string(reg_body.Find([]byte(doc)))
+	body = this.RegScript.ReplaceAllString(body, "")
+	body = this.RegStyle.ReplaceAllString(body,"")
+	bodyNode,_ := html.Parse(strings.NewReader(body))
+
+	// 1.保留body部分
+	node := bodyNode.FirstChild
+	for node != nil {
+		matchString := ""
+		for _, a := range  node.Attr {
+			if a.Key == "class" || a.Key == "id" {
+				matchString = fmt.Sprintf("%s %s",matchString, a.Val)
+			}
+		}
+		if this.UnLikeyCandidates.Match([]byte(matchString)) {
+			fmt.Println("node:",node.DataAtom.String() ," -- ", node.Data, "--", matchString)
+
+			node = this.removeAndGetNext(node)
+			continue
+		}
+		node = this.getNextNode(node, false)
+	}
+	fmt.Println("html:", this.renderNode(bodyNode))
+
+}
+
+func (this *ServiceContent)renderNode(n *html.Node) string {
+	var buf bytes.Buffer
+	w := io.Writer(&buf)
+	html.Render(w, n)
+	return buf.String()
 }

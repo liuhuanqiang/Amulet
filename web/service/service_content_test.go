@@ -55,7 +55,7 @@ func TestServiceContent_GetContent(t *testing.T) {
 	url := "https://blog.qiniu.com/archives/8728"
 
 	content := &ServiceContent{}
-	title, des := content.GetContent(88,url)
+	title, des := content.GetContent(0,url)
 	fmt.Println(title)
 	fmt.Println(des)
 }
