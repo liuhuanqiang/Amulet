@@ -10,14 +10,26 @@ import (
 	"fmt"
 	"strings"
 	"golang.org/x/net/html/atom"
+	"math"
 )
 
 type Readability struct {
 	UnLikelyCandidates *regexp.Regexp
+	OkMaybeItsACandidate *regexp.Regexp
+	Positive *regexp.Regexp
+	Negative *regexp.Regexp
+}
+
+type CandidateNode struct {
+	Node *html.Node
+	Score int
 }
 
 func (this *Readability) initRegexp(){
 	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav`)
+	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
+	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
+	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
 }
 
 func (this *Readability) GetContent(url string) {
@@ -40,7 +52,7 @@ func (this *Readability) GetContent(url string) {
 			}
 		}
 		// 第一步移除不可能是content的标签
-		if this.UnLikelyCandidates.Match([]byte(matchString)) {
+		if this.UnLikelyCandidates.Match([]byte(matchString)) && !this.OkMaybeItsACandidate.Match([]byte(matchString)) && node.DataAtom!= atom.A {
 			fmt.Println("[unlikely]:", node.DataAtom.String(), " -- ", node.Data, "--", matchString)
 			node = this.removeAndGetNext(node)
 			continue
@@ -80,9 +92,17 @@ func (this *Readability) GetContent(url string) {
 					FirstChild: child.FirstChild,
 					LastChild:nil,
 				}
+				n := child.FirstChild
+				n.Parent = newNode
+				for n.NextSibling != nil {
+					n.NextSibling.Parent = newNode
+					n = n.NextSibling
+				}
 				node.Parent.AppendChild(newNode)
 				node.Parent.RemoveChild(node)
 				node = this.getNextNode(newNode.Parent,false)
+				continue
+				node = newNode
 			} else if this.hasChildBlockElement(node) {
 				fmt.Println("[block]", node.Attr)
 				child := this.getNodeChildrens(node)[0]
@@ -93,15 +113,85 @@ func (this *Readability) GetContent(url string) {
 					Namespace:child.Namespace,
 					Attr:child.Attr,
 					FirstChild: child.FirstChild,
-					LastChild:nil,
+					LastChild:child.LastChild,
+					Parent:nil,
+					NextSibling:nil,
+				}
+				n := child.FirstChild
+				n.Parent = newNode
+				for n.NextSibling != nil {
+					n.NextSibling.Parent = newNode
+					n = n.NextSibling
 				}
 				node.Parent.AppendChild(newNode)
 				node.Parent.RemoveChild(node)
 				node = this.getNextNode(newNode.Parent,false)
 				continue
+				//node = newNode
+			} else {
+				// todo 如果<div></div>中全是文字，则用<p></p>替换
 			}
 		}
 		node = this.getNextNode(node, false)
+	}
+
+	// 计算分数
+	fmt.Println("html:", this.renderNode(bodyNode))
+	node = bodyNode.FirstChild
+	elementsToScore := []*html.Node{}
+	for node != nil {
+		if node.DataAtom == atom.Section || node.DataAtom == atom.H2 || node.DataAtom == atom.H3 || node.DataAtom == atom.H3 || node.DataAtom == atom.H4 ||
+		 	node.DataAtom == atom.H5 || node.DataAtom == atom.H6 || node.DataAtom == atom.P || node.DataAtom == atom.Td || node.DataAtom == atom.Pre {
+			elementsToScore = append(elementsToScore, node)
+		}
+		node = this.getNextNode(node, false)
+	}
+	candidates := make(map[*html.Node]int)
+	for _, elementToScore := range elementsToScore {
+		if elementToScore.Parent == nil {
+			continue
+		}
+		innerText := this.getInnerText(elementToScore)
+		//fmt.Println("[sore]:", innerText)
+		if len(innerText) < 25 {
+			continue
+		}
+		ancestors := this.getNodeAncestors(elementToScore, 4)
+		if len(ancestors) == 0 {
+			continue
+		}
+		contentScore := 0
+		// 基本分数
+		contentScore += 1
+		// 每个逗号加一分
+		contentScore += len(strings.Split(innerText, ","))
+		// 每100单词加三分
+		contentScore += int(math.Min(math.Floor(float64(len(innerText))/100),float64(3)))
+		//fmt.Println("[test]:1", elementToScore.DataAtom,elementToScore.Attr, elementToScore.Data)
+		for level, ancestor := range ancestors {
+			//fmt.Println("[test]:",ancestor.DataAtom.String(), ancestor.Attr,ancestor)
+			if ancestor.Parent == nil {
+				continue
+			}
+			if _,exist := candidates[ancestor]; !exist {
+				// 如果不存在
+				candidates[ancestor] = this.getNodeInitScore(ancestor)
+			}
+			divider := 1
+			if level == 0 {
+				divider = 1
+			}  else if level == 1 {
+				divider = 2
+			} else {
+				divider = level * 3
+			}
+			candidates[ancestor] += (contentScore/divider)
+		}
+
+	}
+	// 打印分数
+	for c, score := range candidates {
+		fmt.Println("[Candidate]:", c.DataAtom.String() ,(*c).Attr, " score:", score)
 	}
 	fmt.Println("[html]:", this.renderNode(bodyNode))
 }
@@ -140,7 +230,8 @@ func (this *Readability) renderNode(n *html.Node) string {
 	var buf bytes.Buffer
 	w := io.Writer(&buf)
 	html.Render(w, n)
-	reg := regexp.MustCompile(`(?sU:</*html.*>)|(?sU:</*head.*>)|(?sU:</*body.*>)`)
+	//reg := regexp.MustCompile(`(?sU:</*html.*>)|(?sU:</*head.*>)|(?sU:</*body.*>)`)
+	reg := regexp.MustCompile(`(?sU:</*html.*>)|(?sU:</*head.*>)`)
 	return reg.ReplaceAllString(buf.String(), "")
 	//return buf.String()
 }
@@ -166,6 +257,28 @@ func (this *Readability) getNodeChildrens(n *html.Node) []*html.Node {
 		}
 	}
 	return childs
+}
+
+func (this *Readability) replaceNode(node *html.Node, child *html.Node) {
+	// 替换两个node
+	newNode := &html.Node {
+		Type: child.Type,
+		DataAtom:child.DataAtom,
+		Data: child.Data,
+		Namespace:child.Namespace,
+		Attr:child.Attr,
+		FirstChild: child.FirstChild,
+		LastChild:child.LastChild,
+		Parent:nil,
+		NextSibling:nil,
+	}
+	node.Parent.AppendChild(newNode)
+	node.Parent.RemoveChild(node)
+	n := newNode.FirstChild
+	for n.NextSibling != nil {
+		n.NextSibling.Parent = newNode
+		n = n.NextSibling
+	}
 }
 
 func (this *Readability) removeAndGetNext(node *html.Node) *html.Node {
@@ -220,4 +333,72 @@ func (this *Readability) hasChildBlockElement(node *html.Node) bool {
 		return true
 	}
 	return false
+}
+
+func (this *Readability) getInnerText(n *html.Node) string {
+	str := ""
+	for c:= n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.TextNode {
+			str += strings.TrimSpace(strings.Replace(c.Data,"\n","",0))
+		}
+	}
+	return str
+}
+
+func (this *Readability) getNodeAncestors(n *html.Node, depth int) []*html.Node {
+	fmt.Println("[test]:1", n.DataAtom,n.Attr, n.Data)
+	parents := []*html.Node{}
+	i := 0
+	for n.Parent != nil {
+		parents = append(parents, n.Parent)
+		fmt.Println("[test]:", n.Parent.DataAtom,n.Parent.Attr, n.Parent.Data)
+		i++
+		if i >= depth {
+			break
+		}
+		n = n.Parent
+	}
+	return parents
+}
+
+func (this *Readability) getNodeInitScore(node *html.Node) int {
+	switch node.DataAtom {
+	case atom.Div:
+		return 5
+	case atom.Pre:
+	case atom.Td:
+	case atom.Blockquote:
+		return 3
+	case atom.Address:
+	case atom.Ol:
+	case atom.Ul:
+	case atom.Dl:
+	case atom.Dd:
+	case atom.Dt:
+	case atom.Li:
+	case atom.Form:
+		return -3
+	case atom.H1:
+	case atom.H2:
+	case atom.H3:
+	case atom.H4:
+	case atom.H5:
+	case atom.H6:
+	case atom.Th:
+		return -5
+
+	}
+	weight := 0
+	// 否则看class 和 id
+	for _,attr := range node.Attr {
+		if attr.Key == "class" || attr.Key == "id"{
+			if this.Negative.Match([]byte(attr.Val)) {
+				weight -= 25
+			}
+			if this.Positive.Match([]byte(attr.Val)) {
+				weight += 25
+			}
+		}
+	}
+	return weight
 }
