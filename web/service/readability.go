@@ -26,13 +26,13 @@ type CandidateNode struct {
 }
 
 func (this *Readability) initRegexp(){
-	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav`)
+	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal`)
 	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
 }
 
-func (this *Readability) GetContent(url string) {
+func (this *Readability) GetContent(url string) string {
 
 	this.initRegexp()
 	bodyString := this.getBody(this.getHtml(url))
@@ -102,7 +102,7 @@ func (this *Readability) GetContent(url string) {
 				node.Parent.RemoveChild(node)
 				node = this.getNextNode(newNode.Parent,false)
 				continue
-				node = newNode
+				//node = newNode
 			} else if this.hasChildBlockElement(node) {
 				fmt.Println("[block]", node.Attr)
 				child := this.getNodeChildrens(node)[0]
@@ -146,7 +146,7 @@ func (this *Readability) GetContent(url string) {
 		}
 		node = this.getNextNode(node, false)
 	}
-	candidates := make(map[*html.Node]int)
+	candidates := make(map[*html.Node]float32)
 	for _, elementToScore := range elementsToScore {
 		if elementToScore.Parent == nil {
 			continue
@@ -156,17 +156,17 @@ func (this *Readability) GetContent(url string) {
 		if len(innerText) < 25 {
 			continue
 		}
-		ancestors := this.getNodeAncestors(elementToScore, 4)
+		ancestors := this.getNodeAncestors(elementToScore, 3)
 		if len(ancestors) == 0 {
 			continue
 		}
-		contentScore := 0
+		contentScore := float32(0)
 		// 基本分数
 		contentScore += 1
 		// 每个逗号加一分
-		contentScore += len(strings.Split(innerText, ","))
+		contentScore += float32(len(strings.Split(innerText, ",")))
 		// 每100单词加三分
-		contentScore += int(math.Min(math.Floor(float64(len(innerText))/100),float64(3)))
+		contentScore += float32(math.Min(math.Floor(float64(len(innerText))/100),float64(3)))
 		//fmt.Println("[test]:1", elementToScore.DataAtom,elementToScore.Attr, elementToScore.Data)
 		for level, ancestor := range ancestors {
 			//fmt.Println("[test]:",ancestor.DataAtom.String(), ancestor.Attr,ancestor)
@@ -185,21 +185,116 @@ func (this *Readability) GetContent(url string) {
 			} else {
 				divider = level * 3
 			}
-			candidates[ancestor] += (contentScore/divider)
+			candidates[ancestor] += (contentScore/float32(divider))
 		}
 
 	}
 	// 打印分数
-	for c, score := range candidates {
+	maxScore := float32(0)
+	var topCandidate *html.Node
+	for c := range candidates {
+
+		score := candidates[c]* (1 - this.getLinkDensity(c))
+		candidates[c] = score
 		fmt.Println("[Candidate]:", c.DataAtom.String() ,(*c).Attr, " score:", score)
+		if topCandidate == nil {
+			maxScore = score
+			topCandidate = c
+		} else {
+			if score > maxScore {
+				maxScore = score
+				topCandidate = c
+			}
+		}
 	}
-	fmt.Println("[html]:", this.renderNode(bodyNode))
+
+	if topCandidate == nil || topCandidate.DataAtom == atom.Body {
+		// 如果得分最高的是body或者为空, 将body改成div就可以了
+	} else {
+		// 如果 寻找分数与之接近的node
+		alternativeCandidateAncestors := [][]*html.Node{}
+		for c, score := range candidates {
+			if float32(score)*0.75 >= float32(maxScore) {
+				alternativeCandidateAncestors = append(alternativeCandidateAncestors, this.getNodeAncestors(c,3))
+			}
+		}
+		if len(alternativeCandidateAncestors) >= 3 {
+			parentOfTopCandidate := topCandidate.Parent
+			listsContainingThisAncestor := 0
+			for i := 0; i < len(alternativeCandidateAncestors) && listsContainingThisAncestor < 3;i ++ {
+				for _, an := range alternativeCandidateAncestors[i] {
+					if an == parentOfTopCandidate {
+						listsContainingThisAncestor ++
+					}
+				}
+			}
+			if listsContainingThisAncestor >= 3 {
+				topCandidate = parentOfTopCandidate
+			}
+		}
+
+	}
+	if _,exist:= candidates[topCandidate]; !exist {
+		candidates[topCandidate] = this.getNodeInitScore(topCandidate)
+	}
+	lastScore := float32(candidates[topCandidate])
+	fmt.Println("[lastScore]:", lastScore)
+	// 查看他的相邻节点，如果分数相似，则认为也是文章的一部分
+	siblingScoreThreshold := float32(10)
+	if float32(lastScore)*0.2 > siblingScoreThreshold {
+		siblingScoreThreshold = lastScore * 0.2
+	}
+	parentOfTopCandidate := topCandidate.Parent
+	child := parentOfTopCandidate.FirstChild
+	fmt.Println("[sibing]1:", parentOfTopCandidate)
+	for child != nil {
+		if child != nil && topCandidate != child {
+			fmt.Println("[sibing]:", child.Attr,child.DataAtom.String(),"  ", child)
+			flag := false
+			contentBonus := float32(0)
+			if child.DataAtom == topCandidate.DataAtom {
+				contentBonus += lastScore * 0.2
+			}
+			if score,exist := candidates[child]; exist && (float32(score) + contentBonus) >= siblingScoreThreshold{
+				flag = true
+			} else if child.DataAtom == atom.P {
+				nodeContent := this.getInnerText(child)
+				linkDensity := this.getLinkDensity(child)
+				fmt.Println("q11:", len(nodeContent))
+				reg,_ := regexp.Compile(`.( |$)`)
+				if len(nodeContent) >= 80 && linkDensity < 0.25 {
+					flag = true
+				} else if len(nodeContent) < 80 && len(nodeContent) > 0 && linkDensity == 0 && reg.Match([]byte(nodeContent)) {
+					flag = true
+				}
+			}
+			if !flag {
+				next := child.NextSibling
+				parentOfTopCandidate.RemoveChild(child)
+				child = next
+				continue
+			}
+		}
+		child = child.NextSibling
+	}
+	// 寻找分数最高的节点
+	node = bodyNode.FirstChild
+	for node != nil {
+		if node.Type == html.TextNode  && strings.TrimSpace(strings.Replace(node.Data,"\n","",0)) == "" {
+			node = this.removeAndGetNext(node)
+		} else {
+			node = this.getNextNode(node, false)
+		}
+	}
+	fmt.Println("html:", this.renderNode(bodyNode))
+	return this.renderNode(bodyNode)
+
 }
 
 func (this *Readability) getHtml(url string) string {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, bytes.NewReader([]byte("")));
-	req.Header.Set("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36")
+	req.Header.Set("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36")
 	resp, _ := client.Do(req)
 	str,_ := ioutil.ReadAll(resp.Body)
 	defer  resp.Body.Close()
@@ -337,10 +432,17 @@ func (this *Readability) hasChildBlockElement(node *html.Node) bool {
 
 func (this *Readability) getInnerText(n *html.Node) string {
 	str := ""
-	for c:= n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.TextNode {
-			str += strings.TrimSpace(strings.Replace(c.Data,"\n","",0))
+	//for c:= n.FirstChild; c != nil; c = c.NextSibling {
+	//	if c.Type == html.TextNode {
+	//		str += strings.TrimSpace(strings.Replace(c.Data,"\n","",0))
+	//	}
+	//}
+	node := n.FirstChild
+	for node != nil {
+		if node.Type == html.TextNode {
+			str += strings.TrimSpace(strings.Replace(node.Data,"\n","",0))
 		}
+		node = this.getNextNode(node, false)
 	}
 	return str
 }
@@ -349,9 +451,8 @@ func (this *Readability) getNodeAncestors(n *html.Node, depth int) []*html.Node 
 	fmt.Println("[test]:1", n.DataAtom,n.Attr, n.Data)
 	parents := []*html.Node{}
 	i := 0
-	for n.Parent != nil {
+	for n.Parent != nil && n.Parent.DataAtom != atom.Html {
 		parents = append(parents, n.Parent)
-		fmt.Println("[test]:", n.Parent.DataAtom,n.Parent.Attr, n.Parent.Data)
 		i++
 		if i >= depth {
 			break
@@ -361,7 +462,7 @@ func (this *Readability) getNodeAncestors(n *html.Node, depth int) []*html.Node 
 	return parents
 }
 
-func (this *Readability) getNodeInitScore(node *html.Node) int {
+func (this *Readability) getNodeInitScore(node *html.Node) float32 {
 	switch node.DataAtom {
 	case atom.Div:
 		return 5
@@ -388,7 +489,7 @@ func (this *Readability) getNodeInitScore(node *html.Node) int {
 		return -5
 
 	}
-	weight := 0
+	weight := float32(0)
 	// 否则看class 和 id
 	for _,attr := range node.Attr {
 		if attr.Key == "class" || attr.Key == "id"{
@@ -401,4 +502,23 @@ func (this *Readability) getNodeInitScore(node *html.Node) int {
 		}
 	}
 	return weight
+}
+
+func (this *Readability) getLinkDensity(node *html.Node) float32 {
+	innerText := this.getInnerText(node)
+	if len(innerText) == 0 {
+		return 0
+	}
+	textLength := float32(len(innerText))
+	linkLength := float32(0)
+	n := node.FirstChild
+	for n != nil {
+		if n.DataAtom == atom.A {
+			linkLength += float32(len(this.getInnerText(n)))
+			n = this.getNextNode(n, true)
+		} else {
+			n = this.getNextNode(n, false)
+		}
+	}
+	return linkLength/textLength
 }

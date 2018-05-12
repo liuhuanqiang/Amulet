@@ -16,6 +16,7 @@ import (
 
 type Content struct {
 	Service  *service.ServiceContent
+	Readability *service.Readability
 }
 
 const (
@@ -26,6 +27,7 @@ const (
 
 func (this *Content) Init() {
 	this.Service = &service.ServiceContent{}
+	this.Readability = &service.Readability{}
 }
 /**
 	获取最新的文章的列表
@@ -92,11 +94,13 @@ func (this *Content) GetArticle(str string) interface{} {
 	json.Unmarshal([]byte(str), req)
 	glog.Info("GetArticle:", str ,"  page:" ,req.Linkid, " source:", req.Source)
 	if req.Source == Source_Blog {
-		fid, url := db.GetDB().GetLink("tb_blog", req.Linkid)
+		_, url := db.GetDB().GetLink("tb_blog", req.Linkid)
 
 		resp := &msg.ArticleResp{}
 		resp.Url = url
-		resp.Title, resp.Content = this.Service.GetContent(fid, url)
+		//resp.Title, resp.Content = this.Service.GetContent(fid, url)
+		resp.Title = "test"
+		resp.Content = this.Readability.GetContent(url)
 		return resp
 	} else if req.Source == Source_ZhiHu {
 		_, url := db.GetDB().GetLink("tb_zhihu", req.Linkid)
@@ -132,3 +136,10 @@ func (this *Content) GetArticle(str string) interface{} {
 	}
 }
 
+func (this *Content) GetArticleByUrl(url string) interface{} {
+	resp := &msg.ArticleResp{}
+	resp.Url = url
+	resp.Title = "test"
+	resp.Content = this.Readability.GetContent(url)
+	return resp
+}

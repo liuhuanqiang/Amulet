@@ -72,6 +72,8 @@ func (this *Router) write(w http.ResponseWriter,data interface{}, code int, info
 		resp.Msg = err.Error()
 		resp.Code = msg.HttpStatus_Exception
 	}
+	w.Header().Set("Access-Control-Allow-Origin","*");
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.Write(bs)
 }
