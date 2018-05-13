@@ -35,7 +35,9 @@ func (this *Readability) initRegexp(){
 func (this *Readability) GetContent(url string) string {
 
 	this.initRegexp()
-	bodyString := this.getBody(this.getHtml(url))
+	htmlStr := this.getHtml(url)
+	fmt.Println("htmlstr:", htmlStr)
+	bodyString := this.getBody(htmlStr)
 	//fmt.Println("body:", bodyString)
 	if bodyString == "" {
 		fmt.Println("not exist body tag")
@@ -521,4 +523,8 @@ func (this *Readability) getLinkDensity(node *html.Node) float32 {
 		}
 	}
 	return linkLength/textLength
+}
+
+func (this *Readability) cleanClass(node *html.Node) {
+	
 }
