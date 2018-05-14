@@ -279,12 +279,13 @@ func (this *Readability) GetContent(url string) string {
 		}
 		child = child.NextSibling
 	}
-	// 寻找分数最高的节点
 	node = bodyNode.FirstChild
 	for node != nil {
 		if node.Type == html.TextNode  && strings.TrimSpace(strings.Replace(node.Data,"\n","",0)) == "" {
 			node = this.removeAndGetNext(node)
 		} else {
+			node = this.cleanClass(node)
+
 			node = this.getNextNode(node, false)
 		}
 	}
@@ -525,6 +526,38 @@ func (this *Readability) getLinkDensity(node *html.Node) float32 {
 	return linkLength/textLength
 }
 
-func (this *Readability) cleanClass(node *html.Node) {
-	
+func (this *Readability) cleanClass(node *html.Node) *html.Node{
+	fmt.Println("[cleanClass1]:", node.DataAtom.String(), node.Attr)
+	if node != nil && node.Type == html.ElementNode && node.DataAtom != atom.Html && len(node.Attr) > 0 {
+		var Attr []html.Attribute
+		for _, attr := range node.Attr {
+			if attr.Key == "src" && attr.Key == "link" {
+				Attr = append(Attr, attr)
+			}
+		}
+		fmt.Println("[cleanClass]:", node.DataAtom.String(), node.Attr)
+		newNode := &html.Node {
+			Type: node.Type,
+			DataAtom:node.DataAtom,
+			Data: node.Data,
+			Namespace:node.Namespace,
+			Attr: Attr,
+			FirstChild: node.FirstChild,
+			LastChild:node.LastChild,
+			Parent:nil,
+			NextSibling:nil,
+		}
+		n := node.FirstChild
+		if n != nil {
+			node.FirstChild.Parent = newNode
+			for n.NextSibling != nil {
+				n.NextSibling.Parent = newNode
+				n = n.NextSibling
+			}
+		}
+		node.Parent.AppendChild(newNode)
+		node.Parent.RemoveChild(node)
+		return  newNode
+	}
+	return node
 }
