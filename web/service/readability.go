@@ -26,7 +26,7 @@ type CandidateNode struct {
 }
 
 func (this *Readability) initRegexp(){
-	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal`)
+	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise`)
 	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
@@ -36,9 +36,8 @@ func (this *Readability) GetContent(url string) string {
 
 	this.initRegexp()
 	htmlStr := this.getHtml(url)
-	fmt.Println("htmlstr:", htmlStr)
 	bodyString := this.getBody(htmlStr)
-	//fmt.Println("body:", bodyString)
+	fmt.Println("body:", bodyString)
 	if bodyString == "" {
 		fmt.Println("not exist body tag")
 	}
@@ -76,7 +75,7 @@ func (this *Readability) GetContent(url string) string {
 		}
 		node = this.getNextNode(node, false)
 	}
-	fmt.Println("html:", this.renderNode(bodyNode))
+	//fmt.Println("html:", this.renderNode(bodyNode))
 	node = bodyNode.FirstChild
 	for node != nil {
 		// 第三步 如果标签div中只有一个children, 则去掉这个div。 如果只有文字，就用p替换
@@ -138,7 +137,7 @@ func (this *Readability) GetContent(url string) string {
 	}
 
 	// 计算分数
-	fmt.Println("html:", this.renderNode(bodyNode))
+	//fmt.Println("html:", this.renderNode(bodyNode))
 	node = bodyNode.FirstChild
 	elementsToScore := []*html.Node{}
 	for node != nil {
@@ -158,7 +157,9 @@ func (this *Readability) GetContent(url string) string {
 		if len(innerText) < 25 {
 			continue
 		}
+		fmt.Println("[test]:", elementToScore.DataAtom.String(), elementToScore.Attr)
 		ancestors := this.getNodeAncestors(elementToScore, 3)
+		fmt.Println("[test1]:", elementToScore.DataAtom.String(), elementToScore.Attr)
 		if len(ancestors) == 0 {
 			continue
 		}
@@ -212,6 +213,7 @@ func (this *Readability) GetContent(url string) string {
 
 	if topCandidate == nil || topCandidate.DataAtom == atom.Body {
 		// 如果得分最高的是body或者为空, 将body改成div就可以了
+		fmt.Println("[topCandidate]: 最高分为空")
 	} else {
 		// 如果 寻找分数与之接近的node
 		alternativeCandidateAncestors := [][]*html.Node{}
@@ -240,7 +242,8 @@ func (this *Readability) GetContent(url string) string {
 		candidates[topCandidate] = this.getNodeInitScore(topCandidate)
 	}
 	lastScore := float32(candidates[topCandidate])
-	fmt.Println("[lastScore]:", lastScore)
+	fmt.Println("[lastScore]:", lastScore, topCandidate.DataAtom.String(), topCandidate.Attr)
+
 	// 查看他的相邻节点，如果分数相似，则认为也是文章的一部分
 	siblingScoreThreshold := float32(10)
 	if float32(lastScore)*0.2 > siblingScoreThreshold {
@@ -248,10 +251,10 @@ func (this *Readability) GetContent(url string) string {
 	}
 	parentOfTopCandidate := topCandidate.Parent
 	child := parentOfTopCandidate.FirstChild
-	fmt.Println("[sibing]1:", parentOfTopCandidate)
+	fmt.Println("[sibing] parent:", parentOfTopCandidate.DataAtom.String(), parentOfTopCandidate.Attr)
 	for child != nil {
-		if child != nil && topCandidate != child {
-			fmt.Println("[sibing]:", child.Attr,child.DataAtom.String(),"  ", child)
+		if child != nil && topCandidate != child && child.Type == html.ElementNode {
+			fmt.Println("[sibing]:", child.DataAtom.String(),child.Attr)
 			flag := false
 			contentBonus := float32(0)
 			if child.DataAtom == topCandidate.DataAtom {
@@ -262,7 +265,6 @@ func (this *Readability) GetContent(url string) string {
 			} else if child.DataAtom == atom.P {
 				nodeContent := this.getInnerText(child)
 				linkDensity := this.getLinkDensity(child)
-				fmt.Println("q11:", len(nodeContent))
 				reg,_ := regexp.Compile(`.( |$)`)
 				if len(nodeContent) >= 80 && linkDensity < 0.25 {
 					flag = true
@@ -271,26 +273,27 @@ func (this *Readability) GetContent(url string) string {
 				}
 			}
 			if !flag {
+				fmt.Println("[remove sibing]:", child.DataAtom.String(),child.Attr)
 				next := child.NextSibling
 				parentOfTopCandidate.RemoveChild(child)
 				child = next
 				continue
+			} else {
+				fmt.Println("[keep sibing]:", child.DataAtom.String(),child.Attr)
 			}
 		}
 		child = child.NextSibling
 	}
-	node = bodyNode.FirstChild
+	node = parentOfTopCandidate.FirstChild
 	for node != nil {
 		if node.Type == html.TextNode  && strings.TrimSpace(strings.Replace(node.Data,"\n","",0)) == "" {
 			node = this.removeAndGetNext(node)
 		} else {
-			node = this.cleanClass(node)
-
 			node = this.getNextNode(node, false)
 		}
 	}
-	fmt.Println("html:", this.renderNode(bodyNode))
-	return this.renderNode(bodyNode)
+	fmt.Println("html:", this.renderNode(parentOfTopCandidate))
+	return this.renderNode(parentOfTopCandidate)
 
 }
 
@@ -450,10 +453,10 @@ func (this *Readability) getInnerText(n *html.Node) string {
 	return str
 }
 
-func (this *Readability) getNodeAncestors(n *html.Node, depth int) []*html.Node {
-	fmt.Println("[test]:1", n.DataAtom,n.Attr, n.Data)
+func (this *Readability) getNodeAncestors(node *html.Node, depth int) []*html.Node {
 	parents := []*html.Node{}
 	i := 0
+	n := node
 	for n.Parent != nil && n.Parent.DataAtom != atom.Html {
 		parents = append(parents, n.Parent)
 		i++
@@ -526,16 +529,16 @@ func (this *Readability) getLinkDensity(node *html.Node) float32 {
 	return linkLength/textLength
 }
 
-func (this *Readability) cleanClass(node *html.Node) *html.Node{
-	fmt.Println("[cleanClass1]:", node.DataAtom.String(), node.Attr)
+func (this *Readability) cleanStyles(node *html.Node) *html.Node{
+	fmt.Println("[cleanStyles]:", node.DataAtom.String(), node.Attr)
 	if node != nil && node.Type == html.ElementNode && node.DataAtom != atom.Html && len(node.Attr) > 0 {
 		var Attr []html.Attribute
 		for _, attr := range node.Attr {
-			if attr.Key == "src" && attr.Key == "link" {
+			if attr.Key == "src" || attr.Key == "href" {
 				Attr = append(Attr, attr)
 			}
 		}
-		fmt.Println("[cleanClass]:", node.DataAtom.String(), node.Attr)
+		fmt.Println("[cleanStyles]:", node.DataAtom.String(), node.Attr)
 		newNode := &html.Node {
 			Type: node.Type,
 			DataAtom:node.DataAtom,
@@ -555,9 +558,30 @@ func (this *Readability) cleanClass(node *html.Node) *html.Node{
 				n = n.NextSibling
 			}
 		}
-		node.Parent.AppendChild(newNode)
+		node.Parent.InsertBefore(newNode,node)
 		node.Parent.RemoveChild(node)
 		return  newNode
+	}
+	return node
+}
+
+// 过滤掉没用的数据
+func (this *Readability) prepArticle(node *html.Node) {
+	// 去掉样式
+	node = this.clean(node, "object")
+	node = this.clean(node, "embed")
+}
+
+
+func (this *Readability) clean(node *html.Node, tag string) html.Node {
+	reg,_ := regexp.Compile(tag)
+
+	if node != nil {
+		if reg.Match([]byte(node.DataAtom.String())) {
+			node = this.removeAndGetNext(node)
+		} else {
+			node = this.getNextNode(node, false)
+		}
 	}
 	return node
 }
