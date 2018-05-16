@@ -18,6 +18,7 @@ type Readability struct {
 	OkMaybeItsACandidate *regexp.Regexp
 	Positive *regexp.Regexp
 	Negative *regexp.Regexp
+	Normalize *regexp.Regexp
 }
 
 type CandidateNode struct {
@@ -30,6 +31,7 @@ func (this *Readability) initRegexp(){
 	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
+	this.Normalize, _ = regexp.Compile(`\s{2,}`)
 }
 
 func (this *Readability) GetContent(url string) string {
@@ -157,9 +159,8 @@ func (this *Readability) GetContent(url string) string {
 		if len(innerText) < 25 {
 			continue
 		}
-		fmt.Println("[test]:", elementToScore.DataAtom.String(), elementToScore.Attr)
 		ancestors := this.getNodeAncestors(elementToScore, 3)
-		fmt.Println("[test1]:", elementToScore.DataAtom.String(), elementToScore.Attr)
+
 		if len(ancestors) == 0 {
 			continue
 		}
@@ -179,6 +180,7 @@ func (this *Readability) GetContent(url string) string {
 			if _,exist := candidates[ancestor]; !exist {
 				// 如果不存在
 				candidates[ancestor] = this.getNodeInitScore(ancestor)
+				fmt.Println("[Candidate]:",ancestor.DataAtom.String() ,ancestor.Attr, candidates[ancestor])
 			}
 			divider := 1
 			if level == 0 {
@@ -292,6 +294,7 @@ func (this *Readability) GetContent(url string) string {
 			node = this.getNextNode(node, false)
 		}
 	}
+	parentOfTopCandidate = this.prepArticle(parentOfTopCandidate)
 	fmt.Println("html:", this.renderNode(parentOfTopCandidate))
 	return this.renderNode(parentOfTopCandidate)
 
@@ -415,9 +418,14 @@ func (this *Readability) getNextNode(node *html.Node, ignoreSelfAndKids bool) *h
 func (this *Readability) isElementWithoutContent(node *html.Node) bool {
 	if strings.TrimSpace(strings.Replace(this.getNodeContent(node),"\n","",0)) == "" {
 		return true
-	} else {
-		return false
 	}
+
+	fmt.Println("[isElementWithoutContent]:", node.DataAtom.String(), node.Attr, len(this.getNodeChildrens(node)))
+	//if len(this.getNodeChildrens(node)) == 0 || len(this.getNodeChildrens(node)) == len(this.getChildrensByTag(node, "br")) + len(this.getChildrensByTag(node, "hr")) {
+	//	return true
+	//}
+
+	return false
 }
 
 func (this *Readability) hasSinglePInsideElement(node *html.Node) bool {
@@ -495,6 +503,10 @@ func (this *Readability) getNodeInitScore(node *html.Node) float32 {
 		return -5
 
 	}
+	return this.getClassWeight(node)
+}
+
+func (this *Readability) getClassWeight(node *html.Node) float32 {
 	weight := float32(0)
 	// 否则看class 和 id
 	for _,attr := range node.Attr {
@@ -509,6 +521,7 @@ func (this *Readability) getNodeInitScore(node *html.Node) float32 {
 	}
 	return weight
 }
+
 
 func (this *Readability) getLinkDensity(node *html.Node) float32 {
 	innerText := this.getInnerText(node)
@@ -566,17 +579,44 @@ func (this *Readability) cleanStyles(node *html.Node) *html.Node{
 }
 
 // 过滤掉没用的数据
-func (this *Readability) prepArticle(node *html.Node) {
+func (this *Readability) prepArticle(node *html.Node) *html.Node{
 	// 去掉样式
+	node = this.cleanConditionally(node,"form")
+	node = this.cleanConditionally(node, "fieldset")
+
 	node = this.clean(node, "object")
 	node = this.clean(node, "embed")
+	node = this.clean(node, "h1")
+	node = this.clean(node , "footer")
+	node = this.clean(node, "link")
+	node = this.clean(node, "aside")
+
+	node = this.clean(node, "iframe")
+	node = this.clean(node, "input")
+	node = this.clean(node, "textared")
+	node = this.clean(node, "select")
+	node = this.clean(node, "button")
+
+	node = this.cleanConditionally(node, "table")
+	node = this.cleanConditionally(node, "ul")
+	node = this.cleanConditionally(node, "div")
+	return node
 }
 
+func (this *Readability) hasAncestorTag(node *html.Node, tag string) bool {
+	n := node
+	for n.Parent != nil && n.Parent.DataAtom != atom.Html {
+		if n.DataAtom == atom.Table {
+			return true
+		}
+	}
+	return false
+}
 
-func (this *Readability) clean(node *html.Node, tag string) html.Node {
+func (this *Readability) clean(node *html.Node, tag string) *html.Node {
 	reg,_ := regexp.Compile(tag)
 
-	if node != nil {
+	for node != nil {
 		if reg.Match([]byte(node.DataAtom.String())) {
 			node = this.removeAndGetNext(node)
 		} else {
@@ -584,4 +624,74 @@ func (this *Readability) clean(node *html.Node, tag string) html.Node {
 		}
 	}
 	return node
+}
+
+func (this *Readability) cleanConditionally(n *html.Node, tag string) *html.Node {
+	if n != nil {
+		for _,node := range this.getChildrensByTag(n, tag) {
+			isList := (tag == "ul" || tag == "ol")
+			if this.hasAncestorTag(node, "table") {
+				node.Parent.RemoveChild(node)
+				continue
+			}
+
+			weight := this.getClassWeight(node)
+			if weight < 0 {
+				node.Parent.RemoveChild(node)
+				continue
+			}
+
+			if(len(strings.Split(this.getInnerText(node),",")) < 10){
+				length_p := len(this.getChildrensByTag(node, "p"))
+				length_img := len(this.getChildrensByTag(node, "img"))
+				lenght_li := len(this.getChildrensByTag(node, "li")) - 100
+				length_input := len(this.getChildrensByTag(node,"input"))
+
+				linkDesity := this.getLinkDensity(node)
+				contentLength := len(this.getInnerText(node))
+
+				if length_img > 1 && float32(length_p)/float32(length_img) < 0.5 && !this.hasAncestorTag(node, "figure") {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+				if !isList && lenght_li > length_p {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+
+				if float32(length_input) > float32(length_p/3) {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+				if !isList && contentLength < 25 && (length_img == 0 || length_img > 2) && !this.hasAncestorTag(node, "figure") {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+
+				if !isList && weight < 25 && linkDesity > 0.2 {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+
+				if weight >= 25 && linkDesity > 0.5 {
+					node.Parent.RemoveChild(node)
+					continue
+				}
+			}
+
+		}
+	}
+	return n
+}
+
+
+func (this *Readability) getChildrensByTag(node *html.Node, tag string) []*html.Node {
+	childrens := []*html.Node{}
+	child := node.FirstChild
+	for child != nil {
+		if child.Type == html.ElementNode && child.DataAtom.String() == tag {
+			childrens = append(childrens, child)
+		}
+	}
+	return childrens
 }
