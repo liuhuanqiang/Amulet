@@ -27,7 +27,7 @@ type CandidateNode struct {
 }
 
 func (this *Readability) initRegexp(){
-	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise`)
+	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise|jiathis|bdshare`)
 	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
@@ -55,6 +55,7 @@ func (this *Readability) GetContent(url string) string {
 			}
 		}
 		// 第一步移除不可能是content的标签
+		//fmt.Println("[matchString]:", matchString)
 		if this.UnLikelyCandidates.Match([]byte(matchString)) && !this.OkMaybeItsACandidate.Match([]byte(matchString)) && node.DataAtom!= atom.A {
 			fmt.Println("[unlikely]:", node.DataAtom.String(), " -- ", node.Data, "--", matchString)
 			node = this.removeAndGetNext(node)
@@ -316,15 +317,19 @@ func (this *Readability) getBody(str string) string {
 	body := reg_body.FindString(str)
 
 	// 过滤<script> </script>
-	reg_script := regexp.MustCompile(`(?sU:<script[\s\S]*>)([\s\S]*)(?sU:</script>)`)
+	//reg_script := regexp.MustCompile(`(?sU:<script[\s\S]*>)([\s\S]*)(?sU:</script>)`)
+	reg_script,_ := regexp.Compile(`<script[\S\s]+?</script>`)
 	body = reg_script.ReplaceAllString(body, "")
+
+	reg_noscript,_ := regexp.Compile(`<noscript[\S\s]+?</noscript>`)
+	body = reg_noscript.ReplaceAllString(body, "")
 
 	// 过滤<style> </style>
 	reg_style := regexp.MustCompile(`(?sU:<style[\s\S]*>)([\s\S]*)(?sU:</style>)`)
 	body = reg_style.ReplaceAllString(body,"")
 
 	// 过滤注释
-	reg_anno := regexp.MustCompile(`(?sU:<!).*?(?s:>)`)
+	reg_anno := regexp.MustCompile(`(?sU:<!).*?(?sU:>)`)
 	body = reg_anno.ReplaceAllString(body,"")
 
 	return body
@@ -348,19 +353,22 @@ func (this *Readability) getNodeContent(n *html.Node) string {
 	return buf.String()
 }
 
-func (this *Readability) getNodeChildrens(n *html.Node) []*html.Node {
-	childs := []*html.Node{};
-	for c:= n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type != html.ErrorNode {
-			if c.Type == html.TextNode && strings.TrimSpace(strings.Replace(c.Data,"\n","",0)) == ""{
-				continue
-			} else {
-				childs = append(childs, c)
-			}
+func (this *Readability) getNodeChildrens(node *html.Node) []*html.Node {
 
+	childrens := []*html.Node{}
+	var get func(*html.Node)
+	get = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode ||  (c.Type == html.TextNode && strings.TrimSpace(strings.Replace(c.Data,"\n","",0)) != ""){
+				childrens = append(childrens, c)
+			}
+			get(c)
 		}
+
 	}
-	return childs
+	get(node)
+
+	return childrens
 }
 
 func (this *Readability) replaceNode(node *html.Node, child *html.Node) {
@@ -415,15 +423,17 @@ func (this *Readability) getNextNode(node *html.Node, ignoreSelfAndKids bool) *h
 	return nil
 }
 
+
 func (this *Readability) isElementWithoutContent(node *html.Node) bool {
 	if strings.TrimSpace(strings.Replace(this.getNodeContent(node),"\n","",0)) == "" {
 		return true
 	}
 
-	fmt.Println("[isElementWithoutContent]:", node.DataAtom.String(), node.Attr, len(this.getNodeChildrens(node)))
-	//if len(this.getNodeChildrens(node)) == 0 || len(this.getNodeChildrens(node)) == len(this.getChildrensByTag(node, "br")) + len(this.getChildrensByTag(node, "hr")) {
-	//	return true
-	//}
+	//fmt.Println("[isElementWithoutContent]:", node.DataAtom.String(), node.Attr, len(this.getNodeChildrens(node)),len(this.getChildrensByTag(node, "br")))
+
+	if len(this.getNodeChildrens(node)) == 0 || len(this.getNodeChildrens(node)) == len(this.getChildrensByTag(node, "br")) + len(this.getChildrensByTag(node, "hr")) {
+		return true
+	}
 
 	return false
 }
@@ -437,27 +447,32 @@ func (this *Readability) hasSinglePInsideElement(node *html.Node) bool {
 }
 
 func (this *Readability) hasChildBlockElement(node *html.Node) bool {
-	childrens := this.getNodeChildrens(node)
-	if len(childrens) == 1 && childrens[0].DataAtom == atom.Div {
+	len := 0
+	var first *html.Node
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		if (c.Type == html.TextNode && strings.TrimSpace(strings.Replace(c.Data,"\n","",0)) == "") {
+			continue
+		}
+		len++
+		if len == 1 {
+			first = c
+		}
+	}
+	//fmt.Println("[hasChildBlockElement]:", node.DataAtom.String(), node.Attr, len)
+	if len == 1 && first.DataAtom == atom.Div {
 		return true
 	}
 	return false
 }
 
-func (this *Readability) getInnerText(n *html.Node) string {
+func (this *Readability) getInnerText(node *html.Node) string {
 	str := ""
-	//for c:= n.FirstChild; c != nil; c = c.NextSibling {
-	//	if c.Type == html.TextNode {
-	//		str += strings.TrimSpace(strings.Replace(c.Data,"\n","",0))
-	//	}
-	//}
-	node := n.FirstChild
-	for node != nil {
-		if node.Type == html.TextNode {
-			str += strings.TrimSpace(strings.Replace(node.Data,"\n","",0))
+	for _, c := range (this.getNodeChildrens(node)) {
+		if c.Type == html.TextNode {
+			str += strings.TrimSpace(strings.Replace(c.Data,"\n","",0))
 		}
-		node = this.getNextNode(node, false)
 	}
+
 	return str
 }
 
@@ -583,23 +598,23 @@ func (this *Readability) prepArticle(node *html.Node) *html.Node{
 	// 去掉样式
 	node = this.cleanConditionally(node,"form")
 	node = this.cleanConditionally(node, "fieldset")
+	//
+	//node = this.clean(node, "object")
+	//node = this.clean(node, "embed")
+	//node = this.clean(node, "h1")
+	//node = this.clean(node , "footer")
+	//node = this.clean(node, "link")
+	//node = this.clean(node, "aside")
+	//
+	//node = this.clean(node, "iframe")
+	//node = this.clean(node, "input")
+	//node = this.clean(node, "textared")
+	//node = this.clean(node, "select")
+	//node = this.clean(node, "button")
 
-	node = this.clean(node, "object")
-	node = this.clean(node, "embed")
-	node = this.clean(node, "h1")
-	node = this.clean(node , "footer")
-	node = this.clean(node, "link")
-	node = this.clean(node, "aside")
-
-	node = this.clean(node, "iframe")
-	node = this.clean(node, "input")
-	node = this.clean(node, "textared")
-	node = this.clean(node, "select")
-	node = this.clean(node, "button")
-
-	node = this.cleanConditionally(node, "table")
-	node = this.cleanConditionally(node, "ul")
-	node = this.cleanConditionally(node, "div")
+	//node = this.cleanConditionally(node, "table")
+	//node = this.cleanConditionally(node, "ul")
+	//node = this.cleanConditionally(node, "div")
 	return node
 }
 
@@ -687,11 +702,16 @@ func (this *Readability) cleanConditionally(n *html.Node, tag string) *html.Node
 
 func (this *Readability) getChildrensByTag(node *html.Node, tag string) []*html.Node {
 	childrens := []*html.Node{}
-	child := node.FirstChild
-	for child != nil {
-		if child.Type == html.ElementNode && child.DataAtom.String() == tag {
-			childrens = append(childrens, child)
+	var get func(*html.Node)
+	get = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && c.DataAtom.String() == tag {
+				childrens = append(childrens, c)
+			}
+			get(c)
 		}
+
 	}
+	get(node)
 	return childrens
 }
