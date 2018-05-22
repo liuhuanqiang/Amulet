@@ -17,6 +17,7 @@ import (
 type Content struct {
 	Service  *service.ServiceContent
 	Readability *service.Readability
+	Mss  *service.MaxSubSegment
 }
 
 const (
@@ -28,6 +29,7 @@ const (
 func (this *Content) Init() {
 	this.Service = &service.ServiceContent{}
 	this.Readability = &service.Readability{}
+	this.Mss = &service.MaxSubSegment{}
 }
 /**
 	获取最新的文章的列表
@@ -100,7 +102,8 @@ func (this *Content) GetArticle(str string) interface{} {
 		resp.Url = url
 		//resp.Title, resp.Content = this.Service.GetContent(fid, url)
 		resp.Title = "test"
-		resp.Content = this.Readability.GetContent(url)
+		glog.Info("url:", url)
+		resp.Content = this.Mss.GetContent(url)
 		return resp
 	} else if req.Source == Source_ZhiHu {
 		_, url := db.GetDB().GetLink("tb_zhihu", req.Linkid)
@@ -140,6 +143,6 @@ func (this *Content) GetArticleByUrl(url string) interface{} {
 	resp := &msg.ArticleResp{}
 	resp.Url = url
 	resp.Title = "test"
-	resp.Content = this.Readability.GetContent(url)
+	resp.Content = this.Mss.GetContent(url)
 	return resp
 }

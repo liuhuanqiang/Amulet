@@ -19,6 +19,7 @@ type Readability struct {
 	Positive *regexp.Regexp
 	Negative *regexp.Regexp
 	Normalize *regexp.Regexp
+	RelTag *regexp.Regexp
 }
 
 type CandidateNode struct {
@@ -27,7 +28,7 @@ type CandidateNode struct {
 }
 
 func (this *Readability) initRegexp(){
-	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise|jiathis|bdshare`)
+	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise|jiathis|bdshare|copyright`)
 	this.OkMaybeItsACandidate,_ = regexp.Compile(`and|article|body|column|main|shadow`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 	this.Negative,_ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
@@ -61,6 +62,7 @@ func (this *Readability) GetContent(url string) string {
 			node = this.removeAndGetNext(node)
 			continue
 		}
+
 		node = this.getNextNode(node, false)
 	}
 
@@ -78,7 +80,7 @@ func (this *Readability) GetContent(url string) string {
 		}
 		node = this.getNextNode(node, false)
 	}
-	//fmt.Println("html:", this.renderNode(bodyNode))
+	fmt.Println("html:", this.renderNode(bodyNode))
 	node = bodyNode.FirstChild
 	for node != nil {
 		// 第三步 如果标签div中只有一个children, 则去掉这个div。 如果只有文字，就用p替换
@@ -217,6 +219,7 @@ func (this *Readability) GetContent(url string) string {
 	if topCandidate == nil || topCandidate.DataAtom == atom.Body {
 		// 如果得分最高的是body或者为空, 将body改成div就可以了
 		fmt.Println("[topCandidate]: 最高分为空")
+
 	} else {
 		// 如果 寻找分数与之接近的node
 		alternativeCandidateAncestors := [][]*html.Node{}
@@ -597,7 +600,7 @@ func (this *Readability) cleanStyles(node *html.Node) *html.Node{
 func (this *Readability) prepArticle(node *html.Node) *html.Node{
 	// 去掉样式
 	node = this.cleanConditionally(node,"form")
-	node = this.cleanConditionally(node, "fieldset")
+	//node = this.cleanConditionally(node, "div")
 	//
 	//node = this.clean(node, "object")
 	//node = this.clean(node, "embed")
@@ -632,10 +635,10 @@ func (this *Readability) clean(node *html.Node, tag string) *html.Node {
 	reg,_ := regexp.Compile(tag)
 
 	for node != nil {
-		if reg.Match([]byte(node.DataAtom.String())) {
-			node = this.removeAndGetNext(node)
-		} else {
-			node = this.getNextNode(node, false)
+		for _,c := range this.getChildrensByTag(node, tag) {
+			if reg.Match([]byte(c.DataAtom.String())) {
+				c.Parent.RemoveChild(c)
+			}
 		}
 	}
 	return node
