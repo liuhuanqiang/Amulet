@@ -12,6 +12,9 @@ import (
 
 	"amulet/web/service"
 	"time"
+	"net/http"
+	"io/ioutil"
+	"bytes"
 )
 
 type Content struct {
@@ -22,8 +25,9 @@ type Content struct {
 
 const (
 	Source_Blog = 1
-	Source_JianShu = 2
+
 	Source_ZhiHu = 3
+	Source_JianShu = 4
 )
 
 func (this *Content) Init() {
@@ -94,7 +98,7 @@ func (this *Content) getSummary(article string) string {
 func (this *Content) GetArticle(str string) interface{} {
 	req := &msg.ArticleReq{}
 	json.Unmarshal([]byte(str), req)
-	glog.Info("GetArticle:", str ,"  page:" ,req.Linkid, " source:", req.Source)
+	glog.Info("GetArticle:", str ,"  linkid:" ,req.Linkid, " source:", req.Source)
 	if req.Source == Source_Blog {
 		_, url := db.GetDB().GetLink("tb_blog", req.Linkid)
 
@@ -121,12 +125,13 @@ func (this *Content) GetArticle(str string) interface{} {
 		return resp
 	} else if req.Source == Source_JianShu {
 		_,url := db.GetDB().GetLink("tb_jianshu", req.Linkid)
-		doc, _ := goquery.NewDocument(url)
+		glog.Info("url:", url)
+		doc, _ := goquery.NewDocumentFromReader(strings.NewReader(this.getHtml(url)))
 
 		title,_ := doc.Find(".title").Html();
 		str,_ := doc.Find(".show-content").Html()
 		// 过滤掉div
-		str = utils.RegDiv(str)
+		//str = utils.RegDiv(str)
 		str = utils.RegAnno(str)
 
 		resp := &msg.ArticleResp{}
@@ -145,4 +150,14 @@ func (this *Content) GetArticleByUrl(url string) interface{} {
 	resp.Title = "test"
 	resp.Content = this.Mss.GetContent(url)
 	return resp
+}
+
+func (this *Content) getHtml(url string) string {
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", url, bytes.NewReader([]byte("")));
+	req.Header.Set("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36")
+	resp, _ := client.Do(req)
+	str,_ := ioutil.ReadAll(resp.Body)
+	defer  resp.Body.Close()
+	return string(str)
 }

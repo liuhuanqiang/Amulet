@@ -28,7 +28,7 @@ type ChildrenNode struct {
 func (this *MaxSubSegment) init() {
 	this.Possible,_ = regexp.Compile(`article|body|column|main|shadow|entry|content|article|post|container`)
 	this.Negative, _ = regexp.Compile(`hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|header|legends|menu|related|remark|replies|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget|sponsor|social|pagination|popup|nav|browsehappy|advertise|jiathis|bdshare|copyright|profile`)
-	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise|jiathis|bdshare|copyright|adsbygoogle|respond|spread|msgbar|arrow|back.+?top`)
+	this.UnLikelyCandidates,_ = regexp.Compile(`banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote|nav|browsehappy|modal|toc|advertise|jiathis|bdshare|copyright|adsbygoogle|respond|spread|msgbar|arrow|back.+?top|subscribe|notify`)
 	this.Positive, _ = regexp.Compile(`article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 }
 
@@ -80,23 +80,23 @@ func (this *MaxSubSegment) GetContent(url string) string {
 							}
 						}
 						if this.Negative.Match([]byte(matchString)) {
-							fmt.Println("[Negative]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
+							//fmt.Println("[Negative]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
 							ScoreMap[child.Node] -= float64(10)/float64(divider)
 						}
 
 						if this.Positive.Match([]byte(matchString)) {
-							fmt.Println("[Positive]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
+							//fmt.Println("[Positive]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
 							ScoreMap[child.Node] += float64(20)/float64(divider)
 						}
 
 						if c.Node.DataAtom == atom.Span || c.Node.DataAtom == atom.Header || c.Node.DataAtom == atom.H1 || c.Node.DataAtom == atom.Time{
-							fmt.Println("[Tag]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
+							//fmt.Println("[Tag]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
 							ScoreMap[child.Node] -= float64(10)/float64(divider)
 						}
 
 						if c.Node.DataAtom == atom.Pre || c.Node.DataAtom == atom.Blockquote {
 							// 一般是代码块
-							fmt.Println("[Code]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
+							//fmt.Println("[Code]", " level:", c.Level, " node:",c.Node.DataAtom.String(), " attr:", c.Node.Attr, " data:",c.Node.Data, float64(10)/float64(divider))
 							ScoreMap[child.Node] += float64(20)/float64(divider)
 						}
 
@@ -141,14 +141,20 @@ func (this *MaxSubSegment) GetContent(url string) string {
 
 		node = this.getNextNode(node, false)
 	}
-	fmt.Println(this.renderNode(maxNode))
+	//fmt.Println(this.renderNode(maxNode))
 	fmt.Println("[MaxNode]",  maxNode.DataAtom.String(), "  attr:", maxNode.Attr, " score:", max)
 	// 第三步 去掉空标签
 	node = maxNode.FirstChild
 	for node != nil {
 		if node.DataAtom == atom.Div  {
-			num := len(this.getChildrens(node, true))
-			//fmt.Println("num:",num)
+			childrens := this.getChildrens(node, true)
+			num := 0
+			for _, c := range childrens {
+				if c.Level == 1 {
+					num++
+				}
+			}
+			fmt.Println("num:",num, node.DataAtom.String(), node.Attr)
 			if num == 0 {
 			//空标签，移除掉
 				fmt.Println("[Empty]", node.DataAtom.String(), node.Attr)
@@ -156,8 +162,20 @@ func (this *MaxSubSegment) GetContent(url string) string {
 				continue
 			} else if num == 1 {
 			// 只有一个子元素的标签，移除父标签
-				fmt.Println("[Block]", node.DataAtom.String(), node.Attr)
 
+				parents := this.getParents(node, 5)
+				remove := true
+				for _,parent := range parents {
+					if parent.DataAtom == atom.Table {
+						remove = false
+						break
+					}
+				}
+				if !remove {
+					node = this.getNextNode(node.Parent,true)
+					continue
+				}
+				fmt.Println("[Block]", node.DataAtom.String(), node.Attr)
 				child := this.getChildrens(node, true)[0].Node
 				//fmt.Println("[Block child]", child.DataAtom.String(), child.Attr)
 				newNode := &html.Node {
@@ -181,7 +199,7 @@ func (this *MaxSubSegment) GetContent(url string) string {
 						n = n.NextSibling
 					}
 				}
-				node.Parent.AppendChild(newNode)
+				node.Parent.InsertBefore(newNode,node)
 				node.Parent.RemoveChild(node)
 				node = this.getNextNode(newNode.Parent,false)
 				continue
@@ -197,36 +215,27 @@ func (this *MaxSubSegment) GetContent(url string) string {
 		if node != nil && node.Type == html.ElementNode && node.DataAtom != atom.Html && len(node.Attr) > 0 {
 			var Attr []html.Attribute
 			for _, attr := range node.Attr {
-				if attr.Key == "src" || attr.Key == "href" {
+				if attr.Key == "src" || attr.Key == "href" || attr.Val == "gutter" {
 					Attr = append(Attr, attr)
 				}
 			}
+			node.Attr = Attr
 			fmt.Println("[cleanStyles]:", node.DataAtom.String(), Attr , node.Attr)
-			newNode := &html.Node {
-				Type: node.Type,
-				DataAtom:node.DataAtom,
-				Data: node.Data,
-				Namespace:node.Namespace,
-				Attr: Attr,
-				FirstChild: node.FirstChild,
-				LastChild:node.LastChild,
-				Parent:nil,
-				NextSibling:nil,
-			}
-			n := node.FirstChild
-			if n != nil {
-				node.FirstChild.Parent = newNode
-				for n.NextSibling != nil {
-					n.NextSibling.Parent = newNode
-					n = n.NextSibling
-				}
-			}
-			node.Parent.InsertBefore(newNode,node)
-			node.Parent.RemoveChild(node)
 		}
 		node = this.getNextNode(node, false)
 	}
 
+	// 第五步 去掉button input  form 元素
+	node = maxNode
+	for node != nil {
+		if node.Type == html.ElementNode && (node.DataAtom == atom.Button || node.DataAtom == atom.Input || node.DataAtom == atom.Fieldset || node.DataAtom == atom.Form) {
+			node = this.removeAndGetNext(node)
+		} else {
+			node = this.getNextNode(node, true)
+		}
+	}
+
+	fmt.Println(this.renderNode(maxNode))
 	return this.renderNode(maxNode)
 }
 
@@ -324,4 +333,19 @@ func (this *MaxSubSegment) renderNode(n *html.Node) string {
 	reg := regexp.MustCompile(`(?sU:</*html.*>)|(?sU:</*head.*>)`)
 	return reg.ReplaceAllString(buf.String(), "")
 	//return buf.String()
+}
+
+func (this *MaxSubSegment) getParents(node *html.Node, depth int) []*html.Node {
+	parents := []*html.Node{}
+	i := 0
+	n := node
+	for n.Parent != nil && n.Parent.DataAtom != atom.Html {
+		parents = append(parents, n.Parent)
+		i++
+		if i >= depth {
+			break
+		}
+		n = n.Parent
+	}
+	return parents
 }

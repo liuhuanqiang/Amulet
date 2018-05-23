@@ -11,7 +11,8 @@ func TestMaxSubSegment_GetContent(t *testing.T) {
 	//url := "https://blog.qiniu.com/archives/8741"
 	//url := "http://sec-redclub.com/archives/902/"
 	//url := "http://www.haorooms.com/post/centos_git"
-	url := "http://blog.battcn.com/2018/05/22/springboot/v2-queue-rabbitmq/"
+	//url := "http://blog.battcn.com/2018/05/22/springboot/v2-queue-rabbitmq/"
+	url := "http://www.cnblogs.com/zichi/p/9068481.html"
 
 	mss := &MaxSubSegment{}
 	mss.GetContent(url)
